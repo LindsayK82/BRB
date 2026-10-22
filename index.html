@@ -8,6 +8,7 @@
   <title>BRB | Be Right Back</title>
   <link rel="stylesheet" href="styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.79.0/dist/umd/supabase.min.js" defer></script>
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
   <script src="app.js" defer></script>
 </head>
 <body>
@@ -53,6 +54,23 @@
     </section>
 
     <!-- Main chat page -->
+    <!-- Rules acknowledgment screen (enabled after Turnstile credentials are configured) -->
+    <section id="rulesView" class="view secondary-view" hidden>
+      <div class="panel rules-panel">
+        <p class="eyebrow">WELCOME TO THE CLUBHOUSE</p><h1>Our house rules 💚</h1>
+        <p>We've sent the full welcome email to your inbox. Before you chat, please review these rules.</p>
+        <div class="rules-copy">
+          <p><strong>1. No bullying, harassment, or doxxing.</strong> Threatening other members with doxxing, rape, stalking, or murder may result in an immediate permanent ban.</p>
+          <p><strong>2. Swear freely. Just don't weaponize it.</strong> This is an adult community. Swear about your day, not at each other.</p>
+          <p><strong>3. Keep it respectful.</strong> Debate ideas and politics, but don't insult or intimidate other members.</p>
+          <p><strong>4. Don't be an asshole.</strong> That's our Golden Rule.</p>
+          <p>Everyone starts with five private stars. A human administrator—not a bot or AI—reviews reported comments. Removing a rule-breaking comment costs one star. You can appeal within seven days from your account. At zero stars, you cannot chat but can submit eligible appeals.</p>
+        </div>
+        <label class="rules-checkbox"><input id="rulesAgree" type="checkbox"> I have read and agree to BRB's Community Rules (version 1).</label>
+        <div id="rulesCaptcha"></div><p id="rulesStatus" role="status" class="form-status"></p>
+        <button id="acceptRulesButton" type="button" class="primary-button fit-button">Agree &amp; enter chat</button>
+      </div>
+    </section>
     <section id="chatView" class="view chat-view" aria-labelledby="chatHeading">
       <div class="page-intro">
         <div>

@@ -40,3 +40,10 @@
 .message-menu-options{position:absolute;z-index:20;right:0;top:calc(100% + 3px);width:max-content;min-width:165px;max-width:min(230px,80vw);padding:5px;background:var(--paper);border:1px solid var(--border);border-radius:9px;box-shadow:0 5px 20px rgba(30,40,27,.17)}
 .message-menu-options button{display:block;width:100%;text-align:left;border:0;border-radius:5px;padding:10px 11px;background:transparent;color:var(--forest);font-size:.82rem;cursor:pointer}
 .message-menu-options button:hover,.message-menu-options button:focus-visible{background:#e7eee1}
+
+/* Rules acknowledgment */
+.rules-panel{max-width:760px;margin:1rem auto;padding:1.75rem;}
+.rules-copy{max-height:340px;overflow:auto;padding:1rem;margin:1rem 0;border:1px solid rgba(90,108,79,.3);border-radius:12px;background:rgba(90,108,79,.06);}
+.rules-copy p{margin:.8rem 0;}
+.rules-checkbox{display:flex;align-items:flex-start;gap:.6rem;margin:1rem 0;}
+#rulesCaptcha{min-height:65px;}

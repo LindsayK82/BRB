@@ -4,13 +4,16 @@ const PROJECT_URL = 'https://upfukfioedmxazrdjbek.supabase.co';
 // Publishable key is safe to use in browser code. NEVER put a secret/service_role key here.
 const PUBLISHABLE_KEY = 'sb_publishable__dlT-pOy59gUUMj4QB499Q_CdOtYKp8';
 const db = window.supabase.createClient(PROJECT_URL,PUBLISHABLE_KEY);
+// Turnstile SITE key is public. Add it only after creating a Cloudflare widget.
+const BRB_TURNSTILE_SITE_KEY = '';
+let rulesRequired=false, rulesAccepted=false, rulesCaptchaId=null;
 const ROOMS={Life:'The everyday stuff. The big stuff. Everything in between.',Music:'What are you listening to? Share the songs that stick.',Books:'One more chapter. Then maybe another.',Movies:'A good movie deserves a good conversation.'};
 const $=id=>document.getElementById(id);
 let user=null,profile=null,activeRoom='Life',channel=null, soundEnabled=false, roomVersion=0, isAdmin=false;
 const clock=s=>new Date(s).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'});
 function status(id,msg){$(id).textContent=msg;}
-function showView(which){for(const name of ['welcome','chat','settings','contact','archive','admin'])$(name+'View').hidden=name!==which; const nav=which==='archive'?'chat':which;for(const key of ['chat','settings','contact','admin'])$(key+'Nav').classList.toggle('selected',nav===key);if(which==='settings')renderProfile();if(which==='admin'&&isAdmin)renderAdmin();}
-function go(which){if(!user||!profile){showView('welcome');return;}if(which==='admin'&&!isAdmin)return;showView(which);if(which==='chat')loadRoom();}
+function showView(which){for(const name of ['welcome','chat','settings','contact','archive','admin','rules'])$(name+'View').hidden=name!==which; const nav=which==='archive'?'chat':which;for(const key of ['chat','settings','contact','admin'])$(key+'Nav').classList.toggle('selected',nav===key);if(which==='settings')renderProfile();if(which==='admin'&&isAdmin)renderAdmin();}
+function go(which){if(!user||!profile){showView('welcome');return;}if(which==='admin'&&!isAdmin)return;if(which==='chat'&&rulesRequired&&!rulesAccepted){showView('rules');renderRulesCaptcha();return;}showView(which);if(which==='chat')loadRoom();}
 for(const [id,view] of [['homeButton','chat'],['chatNav','chat'],['settingsNav','settings'],['contactNav','contact'],['accountButton','settings'],['adminNav','admin']])$(id).addEventListener('click',()=>go(view));
 $('signOutButton').addEventListener('click',async()=>{await leaveRoom();await db.auth.signOut();user=null;profile=null;isAdmin=false;$('adminNav').hidden=true;startLogin();});
 function startLogin(){ $('loginForm').hidden=false;$('usernameForm').hidden=true;$('signOutButton').hidden=true; $('headerUsername').textContent='Guest';showView('welcome');}
@@ -25,7 +28,37 @@ async function requestWelcomeEmail(){
   if(!res.ok)console.warn('BRB welcome email could not be sent yet. It will retry on your next sign-in.');
  } catch(err){console.warn('BRB welcome email will retry on next sign-in.',err);}
 }
-async function setupMember(sessionUser){user=sessionUser;void requestWelcomeEmail();const {data,error}=await db.from('member_profiles').select('user_id,username,avatar_url').eq('user_id',user.id).maybeSingle();if(error){status('loginStatus',error.message);startLogin();return;}profile=data;isAdmin=sessionUser.app_metadata?.brb_role==='admin';$('adminNav').hidden=!isAdmin;if(!profile){$('loginForm').hidden=true;$('usernameForm').hidden=false;$('signOutButton').hidden=false;showView('welcome');return;}$('headerUsername').textContent=profile.username;$('signOutButton').hidden=false;go('chat');}
+
+// Rules acknowledgment and server-validated Turnstile challenge
+async function refreshRulesStatus(){
+ rulesRequired=false;rulesAccepted=false;
+ const {data,error}=await db.rpc('brb_my_rules_status');
+ if(error){console.warn('Unable to load rules agreement:',error.message);return;}
+ rulesRequired=Boolean(data?.enforced);
+ rulesAccepted=Number(data?.accepted_version||0)>=Number(data?.required_version||1);
+}
+function renderRulesCaptcha(){
+ if(!BRB_TURNSTILE_SITE_KEY){status('rulesStatus','CAPTCHA setup is pending. The administrator must configure Cloudflare Turnstile.');return;}
+ if(rulesCaptchaId!==null)return;
+ if(!window.turnstile){status('rulesStatus','CAPTCHA is loading. Try again in a moment.');return;}
+ rulesCaptchaId=window.turnstile.render('#rulesCaptcha',{sitekey:BRB_TURNSTILE_SITE_KEY,theme:'auto'});
+}
+$('acceptRulesButton').addEventListener('click',async()=>{
+ if(!$('rulesAgree').checked){status('rulesStatus','Please read and accept the rules first.');return;}
+ if(rulesCaptchaId===null){renderRulesCaptcha();return;}
+ const captchaToken=window.turnstile?.getResponse(rulesCaptchaId);
+ if(!captchaToken){status('rulesStatus','Please complete CAPTCHA.');return;}
+ status('rulesStatus','Recording your agreement…');
+ const {data:{session}}=await db.auth.getSession();
+ if(!session){status('rulesStatus','Sign in again to continue.');return;}
+ try{
+  const res=await fetch(PROJECT_URL+'/functions/v1/brb-accept-rules',{method:'POST',headers:{Authorization:'Bearer '+session.access_token,apikey:PUBLISHABLE_KEY,'Content-Type':'application/json'},body:JSON.stringify({agreed:true,captchaToken,version:1})});
+  const data=await res.json();if(!res.ok)throw Error(data.error||'Agreement could not be saved');
+  rulesAccepted=true;status('rulesStatus','Agreement saved. Welcome in!');go('chat');
+ }catch(e){status('rulesStatus',e.message);window.turnstile?.reset(rulesCaptchaId);}
+});
+
+async function setupMember(sessionUser){user=sessionUser;void requestWelcomeEmail();await refreshRulesStatus();const {data,error}=await db.from('member_profiles').select('user_id,username,avatar_url').eq('user_id',user.id).maybeSingle();if(error){status('loginStatus',error.message);startLogin();return;}profile=data;isAdmin=sessionUser.app_metadata?.brb_role==='admin';$('adminNav').hidden=!isAdmin;if(!profile){$('loginForm').hidden=true;$('usernameForm').hidden=false;$('signOutButton').hidden=false;showView('welcome');return;}$('headerUsername').textContent=profile.username;$('signOutButton').hidden=false;go('chat');}
 $('loginForm').addEventListener('submit',async ev=>{ev.preventDefault();status('loginStatus','Signing in...');const {data,error}=await db.auth.signInWithPassword({email:$('loginEmail').value.trim(),password:$('loginPassword').value});if(error){status('loginStatus',error.message);return;}status('loginStatus','');await setupMember(data.user);});
 $('signupButton').addEventListener('click',async()=>{const email=$('loginEmail').value.trim(),password=$('loginPassword').value;if(!email||password.length<6){status('loginStatus','Enter an email and password (at least 6 characters) first.');return;}const {error}=await db.auth.signUp({email,password});status('loginStatus',error?error.message:'Check your email for a verification link, then sign in.');});
 $('resetPasswordButton').addEventListener('click',async()=>{const email=$('loginEmail').value.trim();if(!email){status('loginStatus','Enter your email first.');return;}const {error}=await db.auth.resetPasswordForEmail(email);status('loginStatus',error?error.message:'If that address has an account, password recovery instructions have been sent.');});
@@ -200,7 +233,7 @@ function renderMembers(){const listed=new Map();if(channel){for(const [id,states
 function changeRoom(room){if(!ROOMS[room])return;activeRoom=room;loadRoom();}
 for(const tab of document.querySelectorAll('.room-tab')){tab.addEventListener('click',()=>changeRoom(tab.dataset.room));tab.addEventListener('keydown',ev=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(ev.key))return;ev.preventDefault();const rooms=Object.keys(ROOMS);const i=rooms.indexOf(activeRoom);const next=ev.key==='Home'?0:ev.key==='End'?rooms.length-1:(i+(ev.key==='ArrowLeft'?-1:1)+rooms.length)%rooms.length;changeRoom(rooms[next]);$('tab-'+rooms[next]).focus();});}
 $('messageInput').addEventListener('input',()=>{$('messageCount').textContent=$('messageInput').value.length+' / 500';});
-$('messageForm').addEventListener('submit',async ev=>{ev.preventDefault();if(!user||!profile)return;const body=$('messageInput').value.trim();if(!body)return;const {error}=await db.from('chat_messages').insert({room_id:activeRoom.toLowerCase(),author_id:user.id,body});if(error){alert('Message not sent: '+error.message);return;}$('messageInput').value='';$('messageCount').textContent='0 / 500';});
+$('messageForm').addEventListener('submit',async ev=>{ev.preventDefault();if(!user||!profile)return;if(rulesRequired&&!rulesAccepted){go('chat');return;}const body=$('messageInput').value.trim();if(!body)return;const {error}=await db.from('chat_messages').insert({room_id:activeRoom.toLowerCase(),author_id:user.id,body});if(error){alert('Message not sent: '+error.message);return;}$('messageInput').value='';$('messageCount').textContent='0 / 500';});
 $('membersToggle').addEventListener('click',()=>{const visible=$('memberSidebar').classList.toggle('open');$('membersToggle').setAttribute('aria-expanded',String(visible));});
 $('archiveButton').addEventListener('click',()=>go('archive'));
 $('backToBooks').addEventListener('click',()=>{activeRoom='Books';go('chat');});
