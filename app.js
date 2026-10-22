@@ -259,7 +259,39 @@ $('archiveButton').addEventListener('click',()=>go('archive'));
 $('backToBooks').addEventListener('click',()=>{activeRoom='Books';go('chat');});
 async function renderProfile(){if(!user||!profile)return;$('profileName').value=profile.username;$('profileEmail').value=user.email||'';$('profilePhoto').disabled=true;$('removePhoto').disabled=true;const avatar=$('avatarPreview');avatar.textContent=profile.username[0].toUpperCase();avatar.style.backgroundImage='';status('profileStatus','');const {data}=await db.from('member_standing').select('stars').eq('user_id',user.id).maybeSingle();renderOwnCases();if(data){$('starGlyphs').textContent='★'.repeat(data.stars)+'☆'.repeat(5-data.stars);$('starSummary').textContent='You have '+data.stars+' out of 5 stars.';}}
 $('profileForm').addEventListener('submit',async ev=>{ev.preventDefault();if(!user)return;const username=$('profileName').value.trim(),email=$('profileEmail').value.trim();if(!/^[A-Za-z0-9_]{3,30}$/.test(username)){status('profileStatus','Use 3–30 letters, numbers, or underscores.');return;}const update=await db.from('member_profiles').update({username}).eq('user_id',user.id);if(update.error){status('profileStatus',update.error.message);return;}profile.username=username;$('headerUsername').textContent=username;let message='Username updated.';if(email!==user.email){const result=await db.auth.updateUser({email});message+=result.error?' Email update failed: '+result.error.message:' Check your email to confirm the address change.';}status('profileStatus',message);});
-$('deleteAccountButton').addEventListener('click',()=>{});
+// Account deletion: authenticated, explicit confirmation, server owns identity.
+$('deleteAccountButton').addEventListener('click',()=>{
+ if(!user)return;
+ $('deleteConfirmText').value='';
+ $('deleteStatus').textContent='';
+ $('confirmDelete').disabled=false;
+ $('deleteDialog').showModal();
+});
+$('confirmDelete').addEventListener('click',async()=>{
+ if($('deleteConfirmText').value.trim()!=='DELETE MY ACCOUNT'){
+  $('deleteStatus').textContent='Type DELETE MY ACCOUNT exactly to continue.';
+  return;
+ }
+ $('confirmDelete').disabled=true;
+ $('deleteStatus').textContent='Deleting your account…';
+ try{
+  const {data:{session}}=await db.auth.getSession();
+  if(!session)throw Error('Your session expired. Please sign in again.');
+  const res=await fetch(PROJECT_URL+'/functions/v1/brb-delete-account',{
+   method:'POST',
+   headers:{Authorization:'Bearer '+session.access_token,apikey:PUBLISHABLE_KEY,'Content-Type':'application/json'},
+   body:JSON.stringify({confirmation:'DELETE MY ACCOUNT'})
+  });
+  const data=await res.json();
+  if(!res.ok||!data.deleted)throw Error(data.error||'Account deletion failed.');
+  await db.auth.signOut({scope:'local'});
+  $('deleteDialog').close();
+  window.location.reload();
+ }catch(err){
+  $('deleteStatus').textContent=err.message||'Could not delete the account.';
+  $('confirmDelete').disabled=false;
+ }
+});
 $('cancelDelete').addEventListener('click',()=>$('deleteDialog').close());
 $('soundToggle').addEventListener('click',()=>{soundEnabled=!soundEnabled;$('soundToggle').setAttribute('aria-pressed',String(soundEnabled));$('soundToggle').title=soundEnabled?'Audio effects coming later':'Sound effects off';$('soundToggle').querySelector('.mute-slash').hidden=soundEnabled;});
 $('year').textContent=new Date().getFullYear();
