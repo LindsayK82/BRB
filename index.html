@@ -107,6 +107,20 @@
         <div class="panel"><h2>Members</h2><p class="field-help">Star counts are private and never displayed to other members.</p><div id="adminMembers" class="admin-list" role="region" aria-label="Member list">Loading…</div></div>
         <div class="panel"><h2>Pending appeals</h2><div id="adminAppeals" class="admin-list">Loading…</div></div>
       </div>
+      <!-- Member reporting queue, visible to administrators only -->
+      <div class="panel admin-reports-panel">
+        <h2>Reported comments</h2><p id="adminReportCount" class="field-help">Loading reports…</p>
+        <div id="adminReports" class="admin-list">Loading…</div>
+        <h3>Reporter history</h3><p class="field-help">Private. Multiple dismissed reports are not automatically considered abuse.</p>
+        <div id="adminReporterHistory" class="admin-list"></div>
+      </div>
+      <!-- Admin email queue controls -->
+      <div class="panel admin-email-panel">
+        <h2>Email notifications</h2>
+        <p class="field-help">Retry moderation emails still waiting in the secure delivery queue. This does not create new messages or deduct stars.</p>
+        <button type="button" id="retryEmailsButton" class="primary-button">Retry Pending Emails</button>
+        <p id="emailRetryStatus" class="form-status" role="status" aria-live="polite"></p>
+      </div>
       <div class="panel admin-history"><h2>Moderation history</h2><div id="adminCases" class="admin-list">Loading…</div></div>
       <p id="adminStatus" class="form-status" role="status"></p>
     </section>

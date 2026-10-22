@@ -23,3 +23,20 @@
 /* BRB admin dashboard and moderation controls */
 .admin-layout{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:22px 0}.admin-history{margin-top:18px}.admin-list{display:flex;flex-direction:column;gap:10px}.admin-entry{background:#f2f3eb;border:1px solid #d6d9c9;border-radius:9px;padding:12px;overflow-wrap:anywhere}.admin-entry p{margin:6px 0;color:var(--muted);font-size:.85rem}.admin-entry small{color:var(--muted)}.admin-entry button{margin:8px 8px 0 0}.message-moderate{margin-top:7px;padding:4px 8px;font-size:.7rem;color:#8b3e33}.admin-entry strong{color:var(--forest)}
 @media(max-width:760px){.admin-layout{grid-template-columns:1fr}}
+
+/* Member reporting controls */
+.message-report{margin-left:.5rem;}
+.admin-reports-panel{margin-top:1rem;}
+.admin-reports-panel .admin-entry{margin-bottom:.75rem;}
+.admin-reports-panel .minor-button{margin:.35rem .35rem .2rem 0;}
+
+/* Discreet per-message options menu */
+.message-body{flex:1;min-width:0}
+.message-action-menu{position:relative;margin-left:auto;flex:none}
+.message-menu-trigger{list-style:none;cursor:pointer;border:1px solid transparent;border-radius:6px;color:var(--moss);font-size:1.25rem;font-weight:800;line-height:1;min-width:29px;min-height:29px;display:grid;place-items:center;user-select:none}
+.message-menu-trigger::-webkit-details-marker{display:none}
+.message-menu-trigger:hover,.message-action-menu[open] .message-menu-trigger{background:#e8eee2;border-color:#c5d0bc}
+.message-menu-trigger:focus-visible{outline:2px solid var(--forest);outline-offset:2px}
+.message-menu-options{position:absolute;z-index:20;right:0;top:calc(100% + 3px);width:max-content;min-width:165px;max-width:min(230px,80vw);padding:5px;background:var(--paper);border:1px solid var(--border);border-radius:9px;box-shadow:0 5px 20px rgba(30,40,27,.17)}
+.message-menu-options button{display:block;width:100%;text-align:left;border:0;border-radius:5px;padding:10px 11px;background:transparent;color:var(--forest);font-size:.82rem;cursor:pointer}
+.message-menu-options button:hover,.message-menu-options button:focus-visible{background:#e7eee1}

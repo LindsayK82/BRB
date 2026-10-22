@@ -26,3 +26,23 @@ This package contains only the four files needed to update your existing BRB VS 
 - Supabase's security advisor still warns about executable SECURITY DEFINER RPCs and disabled leaked-password protection. The RPCs check the admin identity server-side, but the complete negative-permission testing remains to be done.
 
 To serve locally, from the project folder run `python -m http.server 8000` and open http://localhost:8000. Use Ctrl+C to stop.
+
+### Moderation email delivery (October 22 build)
+After an administrator removes a comment or resolves an appeal, the website invokes the deployed `brb-send-moderation-emails` Supabase Edge Function using the administrator's logged-in session. The Edge Function, not the browser, accesses Resend's private API key. Delivery errors leave an item in the private outbox for retry. This is **admin-action-triggered delivery**, not yet an independent scheduled retry job; if the call fails or the browser closes, queued emails will remain until another admin action or scheduled dispatcher is added. Check the Resend delivery dashboard and Supabase Edge Function logs during testing.
+
+DO NOT put RESEND_API_KEY or SUPABASE_SERVICE_ROLE_KEY into these files.
+
+
+## Member reporting (new)
+Every other member's chat message has a Report control. A single report per member per comment is accepted; reports go into the private Admin queue. The admin can dismiss, record a note, or remove the comment and deduct one star. Reporter history displays recent counts; no report automatically triggers moderation.
+IMPORTANT: report rows persist when a comment is removed to preserve the review history; do not publish these records.
+
+
+## Discreet message menu update
+Other members' chat messages now have a small ⋯ options control, with **Hide comment** and **Report comment**. Admins also see **Remove comment (admin)**.
+
+Hide comment is **only for the current member in this browser** (stored in localStorage per Supabase user ID), and does not delete the message, notify anyone, create a report, or deduct stars. Hidden messages remain hidden on room reloads in the same browser. They may still appear in a different browser/device. To undo hiding in this build, clear the `brb-hidden-messages:<your-user-id>` localStorage entry. Later we can add a dedicated hidden-message manager with cross-device persistence.
+
+
+## Welcome Email v1 (October 22, 2026)
+A Supabase auth.users trigger queues one email when email_confirmed_at first becomes non-null. The brb-send-welcome Edge Function verifies the signed-in user, then sends the email through Resend with a per-user idempotency key. The web app calls this on each verified sign-in, but previously sent welcome emails will not re-send. Note: delivery starts when the member has a verified session/visits the site, not at the precise moment of clicking a verification link unless that link creates a session and returns to BRB. Tested database trigger installation and function deployment, but a fresh-account email delivery test remains necessary. Existing verified accounts are not backfilled.
