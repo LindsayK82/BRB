@@ -47,3 +47,8 @@
 .rules-copy p{margin:.8rem 0;}
 .rules-checkbox{display:flex;align-items:flex-start;gap:.6rem;margin:1rem 0;}
 #rulesCaptcha{min-height:65px;}
+
+/* Retention notice shown under the room title */
+.retention-notice{display:flex;gap:.6rem;flex-wrap:wrap;justify-content:space-between;align-items:center;padding:.65rem .9rem;margin:.4rem 0 .7rem;border:1px solid #b8c1a9;background:#f1f1e8;border-radius:10px;color:#34503b;font-size:.86rem;line-height:1.5}
+.retention-timer{font-weight:700;font-variant-numeric:tabular-nums}
+.retention-timer[hidden]{display:none}

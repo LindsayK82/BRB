@@ -1,15 +1,10 @@
-# BRB — Turnstile Connected (staged)
+BRB — Automatic Chat Cleanup (October 22, 2026)
 
-Your public Cloudflare Turnstile SITE KEY has been configured in app.js. The SECRET is not included in these files; it must stay in Supabase as BRB_TURNSTILE_SECRET.
+Replace index.html, app.js, styles.css in VS Code. Keep a backup first.
 
-## Testing
-1. Back up your current four files in VS Code. Replace index.html, app.js, styles.css with the copies in this ZIP (README is documentation).
-2. Load BRB from the hostname registered with Cloudflare Turnstile, not a file:// URL. Refresh with Ctrl+Shift+R.
-3. Log in as a verified test member. You should see the Community Rules agreement view.
-4. Check the rules box; complete the real Turnstile challenge; click Agree & enter chat.
-5. Sign out and log in again. A recorded acknowledgment should bypass the rules view.
-6. Test another unacknowledged account.
-
-Database enforcement is intentionally OFF until end-to-end tests pass. The UI shows the rules gate to test it, but this is NOT a security guarantee until enforcement is switched ON in Supabase.
-
-If the Turnstile widget displays an invalid-sitekey or domain error, open app.js and verify the exact public site key and permitted hostnames from the Cloudflare dashboard. Do not paste the secret into any web file.
+Database job brb-clean-expired-chat is ACTIVE and executes every five minutes.
+Life: rolling 24-hour retention; Music/Books/Movies: rolling seven days.
+The timer on Life shows when the oldest loaded message expires, NOT a fixed daily reset.
+Cleanup excludes messages with pending reports. Archived monthly book clubs must live in a separate table, not the transient chat_messages table.
+The site continues to filter old messages when loading rooms; scheduled deletion removes them from storage.
+Check localhost rendering and confirm the timer on Life, and seven-day notices on other rooms.

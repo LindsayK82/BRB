@@ -96,6 +96,11 @@
               <div><h2 id="roomTitle">Life</h2><p id="roomDescription">The everyday stuff. The big stuff. Everything in between.</p></div>
               <button id="membersToggle" type="button" class="members-toggle" aria-expanded="false" aria-controls="memberSidebar">♙ <span id="mobileOnlineCount">Online</span></button>
             </div>
+            <!-- Chat retention notice: matches the database retention policy. -->
+            <div id="retentionNotice" class="retention-notice" role="note" aria-live="off">
+              <span id="retentionText">Life messages disappear 24 hours after they're posted.</span>
+              <span id="lifeExpiryTimer" class="retention-timer" aria-label="Time until the next Life message expires"></span>
+            </div>
             <div id="booksBanner" class="books-banner" hidden><span aria-hidden="true">✦</span><span>Book club meets on the last Saturday of each month, 8 AM–8 PM Eastern. <button id="archiveButton" class="text-button" type="button">Past discussions →</button></span></div>
             <div id="messages" class="messages" role="log" aria-live="polite" aria-relevant="additions text"></div>
             <form id="messageForm" class="message-compose">
