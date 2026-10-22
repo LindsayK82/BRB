@@ -26,6 +26,15 @@ if(isAdmin && m.author_id!==user.id){const remove=document.createElement('button
 row.dataset.messageId=m.id;row.append(av,body);$('messages').append(row);}
 async function leaveRoom(){if(channel){const old=channel;channel=null;await db.removeChannel(old);}}
 async function loadRoom(){if(!user||!profile)return;const serial=++roomVersion;await leaveRoom();if(serial!==roomVersion)return;const room=activeRoom.toLowerCase();$('roomTitle').textContent=activeRoom;$('roomDescription').textContent=ROOMS[activeRoom];$('roomPanel').setAttribute('aria-labelledby','tab-'+activeRoom);$('booksBanner').hidden=activeRoom!=='Books';document.querySelectorAll('.room-tab').forEach(tab=>{const active=tab.dataset.room===activeRoom;tab.classList.toggle('active',active);tab.setAttribute('aria-selected',String(active));tab.tabIndex=active?0:-1;});clearChat();addText($('messages'),'Welcome to '+activeRoom+'. Pull up a chair.','system-message');const cutoff=new Date(Date.now()-(room==='life'?24:168)*3600000).toISOString();const {data:messages,error}=await db.from('chat_messages').select('id,room_id,author_id,body,created_at').eq('room_id',room).gte('created_at',cutoff).order('created_at',{ascending:true}).limit(200);if(serial!==roomVersion)return;if(error){addText($('messages'),error.message,'system-message');return;}const ids=[...new Set(messages.map(m=>m.author_id))];let names={};if(ids.length){const result=await db.from('member_profiles').select('user_id,username').in('user_id',ids);for(const p of result.data||[])names[p.user_id]=p.username;}if(serial!==roomVersion)return;for(const m of messages)drawMessage(m,names);$('messages').scrollTop=$('messages').scrollHeight;channel=db.channel('brb-room-'+room,{config:{presence:{key:user.id}}});channel.on('presence',{event:'sync'},()=>renderMembers()).on('postgres_changes',{event:'INSERT',schema:'public',table:'chat_messages',filter:'room_id=eq.'+room},async payload=>{if(serial!==roomVersion)return;const m=payload.new;let username=profile.username;if(m.author_id!==user.id){const r=await db.from('member_profiles').select('username').eq('user_id',m.author_id).maybeSingle();username=r.data?.username||'Member';}drawMessage(m,{[m.author_id]:username});$('messages').scrollTop=$('messages').scrollHeight;}).subscribe(async state=>{if(state==='SUBSCRIBED'&&serial===roomVersion)await channel.track({username:profile.username});});renderMembers();}
+// Email dispatch is admin-authenticated server-side; the Resend key never enters this browser.
+async function dispatchModerationEmails(){
+ if(!isAdmin)return;
+ try {
+  const {data,error}=await db.functions.invoke('brb-send-moderation-emails',{body:{}});
+  if(error){console.warn('Moderation email dispatch pending:',error.message);return;}
+  if(data?.failed)console.warn('Some moderation emails could not be delivered:',data);
+ } catch(error){console.warn('Moderation emails remain queued:',error);}
+}
 async function removeMessage(message){
  if(!isAdmin)return;
  const reason=prompt('Why are you removing this comment? The member will lose one star.');
@@ -35,6 +44,7 @@ async function removeMessage(message){
  const {error}=await db.rpc('brb_remove_message',{p_message_id:message.id,p_reason:reason.trim()});
  if(error){alert('Unable to remove comment: '+error.message);return;}
  await loadRoom();
+ await dispatchModerationEmails();
 }
 function makeElement(tag,text,className){const el=document.createElement(tag);el.textContent=text;if(className)el.className=className;return el;}
 async function renderAdmin(){
@@ -63,7 +73,7 @@ async function renderAdmin(){
     if(response.trim().length<5){alert('Please write a longer explanation.');return;}
     if(!confirm(label+' for this appeal?'))return;
     const {error}=await db.rpc('brb_resolve_appeal',{p_appeal_id:appeal.id,p_reverse:reverse,p_response:response.trim()});
-    if(error){alert(error.message);return;}await renderAdmin();
+    if(error){alert(error.message);return;}await renderAdmin();await dispatchModerationEmails();
    });box.append(button);}
   pending.append(box);
  }
