@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#304735" />
+  <meta name="description" content="BRB — a cozy place to chat, just like the old internet." />
+  <title>BRB | Be Right Back</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.79.0/dist/umd/supabase.min.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <!-- Header / primary navigation -->
+  <header class="site-header">
+    <div class="header-inner">
+      <button class="wordmark" id="homeButton" type="button" aria-label="BRB, go to chat">BRB<span class="wordmark-dot">.</span></button>
+      <span class="tagline">Be right back to the good old internet.</span>
+      <nav class="header-actions" aria-label="Main navigation">
+        <button type="button" id="chatNav" class="header-link selected">Chat</button>
+        <button type="button" id="settingsNav" class="header-link">Settings</button>
+        <button type="button" id="contactNav" class="header-link">Contact</button>
+        <button type="button" id="adminNav" class="header-link" hidden>Admin</button>
+        <button type="button" id="soundToggle" class="icon-button" title="Sound effects off" aria-label="Turn sound effects on" aria-pressed="false">♫<span class="mute-slash" aria-hidden="true">/</span></button>
+        <button type="button" id="accountButton" class="account-pill" title="Open settings"><span class="account-dot"></span><span id="headerUsername">Guest</span></button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="main-shell">
+    <!-- Email login and first-time username setup -->
+    <section id="welcomeView" class="view welcome-view" hidden>
+      <div class="welcome-card">
+        <div class="stamp">✳ YOUR LITTLE CORNER OF THE INTERNET</div>
+        <h1>Come on in. <em>Stay a while.</em></h1>
+        <p>Four rooms, good conversation, and absolutely no algorithm deciding what you should see.</p>
+        <form id="loginForm" class="form-stack">
+          <label for="loginEmail">Email address</label><input id="loginEmail" type="email" autocomplete="email" required placeholder="you@example.com" />
+          <label for="loginPassword">Password</label><input id="loginPassword" type="password" autocomplete="current-password" required minlength="6" />
+          <button type="submit" class="primary-button">Sign in →</button>
+          <button type="button" class="minor-button" id="signupButton">Create a new account</button>
+          <button type="button" class="text-button" id="resetPasswordButton">Forgot your password?</button>
+          <p id="loginStatus" class="form-status" role="status"></p>
+        </form>
+        <form id="usernameForm" class="form-stack" hidden>
+          <label for="welcomeName">Choose your username (3–30 letters, numbers, or underscores)</label>
+          <input type="text" id="welcomeName" minlength="3" maxlength="30" pattern="[A-Za-z0-9_]+" autocomplete="nickname" required />
+          <button type="submit" class="primary-button">Enter BRB →</button>
+          <p id="usernameStatus" class="form-status" role="status"></p>
+        </form>
+        <p class="fine-print">Your email address and star rating are private.</p>
+      </div>
+    </section>
+
+    <!-- Main chat page -->
+    <section id="chatView" class="view chat-view" aria-labelledby="chatHeading">
+      <div class="page-intro">
+        <div>
+          <p class="eyebrow">THE CONVERSATION CORNER</p>
+          <h1 id="chatHeading">Pull up a chair.</h1>
+          <p class="intro-subtitle">Pick a room, say hello, and make yourself at home.</p>
+        </div>
+        <div class="room-state"><span class="live-indicator" aria-hidden="true"></span><span>Live chat</span></div>
+      </div>
+
+      <div class="chat-frame">
+        <!-- Room tabs -->
+        <div class="room-tabs" role="tablist" aria-label="Chat rooms">
+          <button id="tab-Life" class="room-tab active" type="button" role="tab" aria-selected="true" aria-controls="roomPanel" data-room="Life">Life</button>
+          <button id="tab-Music" class="room-tab" type="button" role="tab" aria-selected="false" aria-controls="roomPanel" tabindex="-1" data-room="Music">Music</button>
+          <button id="tab-Books" class="room-tab" type="button" role="tab" aria-selected="false" aria-controls="roomPanel" tabindex="-1" data-room="Books">Books</button>
+          <button id="tab-Movies" class="room-tab" type="button" role="tab" aria-selected="false" aria-controls="roomPanel" tabindex="-1" data-room="Movies">Movies</button>
+        </div>
+
+        <div class="room-panel" id="roomPanel" role="tabpanel" aria-labelledby="tab-Life">
+          <div class="chat-column">
+            <div class="room-heading">
+              <div><h2 id="roomTitle">Life</h2><p id="roomDescription">The everyday stuff. The big stuff. Everything in between.</p></div>
+              <button id="membersToggle" type="button" class="members-toggle" aria-expanded="false" aria-controls="memberSidebar">♙ <span id="mobileOnlineCount">Online</span></button>
+            </div>
+            <div id="booksBanner" class="books-banner" hidden><span aria-hidden="true">✦</span><span>Book club meets on the last Saturday of each month, 8 AM–8 PM Eastern. <button id="archiveButton" class="text-button" type="button">Past discussions →</button></span></div>
+            <div id="messages" class="messages" role="log" aria-live="polite" aria-relevant="additions text"></div>
+            <form id="messageForm" class="message-compose">
+              <label class="sr-only" for="messageInput">Write a message</label>
+              <input id="messageInput" type="text" maxlength="500" autocomplete="off" placeholder="Say something nice..." required />
+              <button type="submit" class="send-button">Send <span aria-hidden="true">↗</span></button>
+            </form>
+            <div class="compose-note">Be kind. Be curious. Be right back. <span id="messageCount">0 / 500</span></div>
+          </div>
+          <!-- Online users (demo display; live presence after backend integration) -->
+          <aside class="members-sidebar" id="memberSidebar" aria-label="Users online in this room">
+            <div class="members-header"><span class="live-indicator" aria-hidden="true"></span><h3>In the room</h3><span class="member-count" id="memberCount">1</span></div>
+            <ul class="member-list" id="memberList"></ul>
+            <p class="members-footnote">Just usernames. Nothing more.</p>
+          </aside>
+        </div>
+      </div>
+      <div class="chat-footer"><span>✳ A little old-school, a lot more human.</span><span>No feeds. No followers. Just conversation.</span></div>
+    </section>
+
+    <!-- Administrator dashboard (only revealed after a verified admin login) -->
+    <section id="adminView" class="view secondary-view" hidden>
+      <p class="eyebrow">THE KEYS TO THE CLUBHOUSE</p>
+      <h1>BRB administration.</h1>
+      <p class="intro-subtitle">Member standing, moderation history, and appeals. Private to the administrator.</p>
+      <div class="admin-layout">
+        <div class="panel"><h2>Members</h2><p class="field-help">Star counts are private and never displayed to other members.</p><div id="adminMembers" class="admin-list" role="region" aria-label="Member list">Loading…</div></div>
+        <div class="panel"><h2>Pending appeals</h2><div id="adminAppeals" class="admin-list">Loading…</div></div>
+      </div>
+      <div class="panel admin-history"><h2>Moderation history</h2><div id="adminCases" class="admin-list">Loading…</div></div>
+      <p id="adminStatus" class="form-status" role="status"></p>
+    </section>
+
+    <!-- Settings page -->
+    <section id="settingsView" class="view secondary-view" hidden>
+      <p class="eyebrow">YOUR SPACE</p><h1>Account settings.</h1>
+      <p class="intro-subtitle">Your profile, your way. Private details stay private.</p>
+      <div class="settings-layout">
+        <div class="panel settings-card">
+          <h2>Profile</h2>
+          <form id="profileForm" class="form-stack">
+            <label for="profileName">Username</label><input id="profileName" minlength="2" maxlength="24" required />
+            <label for="profileEmail">Email <span class="private-label">PRIVATE</span></label><input type="email" id="profileEmail" placeholder="you@example.com" autocomplete="email" />
+            <p class="field-help">Your email is not included in your public profile.</p>
+            <label for="profilePhoto">Profile image</label>
+            <div class="avatar-edit"><div id="avatarPreview" class="avatar-preview" aria-label="Profile image preview">B</div><input type="file" id="profilePhoto" accept="image/png,image/jpeg,image/webp" /><button type="button" class="minor-button" id="removePhoto">Remove image</button></div>
+            <p class="field-help">Profile-image uploading will be enabled in a later update.</p>
+            <button type="submit" class="primary-button fit-button">Save changes</button>
+            <p class="form-status" id="profileStatus" role="status"></p>
+          </form>
+        </div>
+        <div class="settings-side">
+          <div class="panel stars-card"><div class="card-heading"><h2>Your stars</h2><span class="private-label">ONLY YOU</span></div><div class="stars" id="starGlyphs" aria-label="Your private stars">★★★★★</div><p id="starSummary">Your stars are loading.</p><p class="field-help">Everyone starts with five. Only the administrator can change your stars.</p></div>
+          <div class="panel moderation-card"><h2>Moderation report</h2><div id="ownModerationReport" class="admin-list"><p class="field-help">Loading private report…</p></div></div>
+          <div class="panel danger-card"><h2>Leaving BRB?</h2><p>Account deletion will be enabled after we finish the secure deletion workflow.</p><button id="deleteAccountButton" type="button" class="danger-button" disabled>Delete my account</button></div>
+        </div>
+      </div>
+    </section>
+
+    <button id="signOutButton" class="minor-button" type="button" hidden>Sign out</button>
+    <!-- Contact page -->
+    <section id="contactView" class="view secondary-view" hidden>
+      <p class="eyebrow">NEED A HAND?</p><h1>Get in touch.</h1><p class="intro-subtitle">Something not working quite right? We'd love to know.</p>
+      <div class="panel contact-card"><div class="contact-symbol" aria-hidden="true">✉</div><h2>We're here to help.</h2><p>For login issues, technical problems, or questions about BRB, email the site administrator.</p><p class="contact-placeholder">Support email address coming soon</p><p class="field-help">We'll add the site's real email address before launch.</p></div>
+    </section>
+
+    <!-- Books archive screen inside chat section -->
+    <section id="archiveView" class="view secondary-view" hidden>
+      <button type="button" id="backToBooks" class="back-button">← Back to Books</button><p class="eyebrow">THE BOOK CLUB SHELF</p><h1>Past discussions.</h1><p class="intro-subtitle">Our monthly book club conversations will live here.</p><div class="panel archive-empty">The shelves are empty for now. Our first archived discussion will show up here after book club!</div>
+    </section>
+  </main>
+  <footer class="site-footer"><span>BRB © <span id="year"></span></span><span>Made for humans, not algorithms. ♡</span></footer>
+  <!-- Delete confirmation dialog -->
+  <dialog id="deleteDialog" class="delete-dialog"><h2>Delete your demo account?</h2><p>This clears your profile and messages stored in this browser. It cannot be undone.</p><div class="dialog-actions"><button id="cancelDelete" class="minor-button" type="button">Keep my account</button><button id="confirmDelete" class="danger-button" type="button">Yes, delete it</button></div></dialog>
+</body>
+</html>
