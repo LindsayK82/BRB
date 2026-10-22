@@ -188,6 +188,6 @@
   </main>
   <footer class="site-footer"><span>BRB © <span id="year"></span></span><span>Made for humans, not algorithms. ♡</span></footer>
   <!-- Delete confirmation dialog -->
-  <dialog id="deleteDialog" class="delete-dialog"><h2>Delete your demo account?</h2><p>This clears your profile and messages stored in this browser. It cannot be undone.</p><div class="dialog-actions"><button id="cancelDelete" class="minor-button" type="button">Keep my account</button><button id="confirmDelete" class="danger-button" type="button">Yes, delete it</button></div></dialog>
+  <dialog id="deleteDialog" class="delete-dialog" aria-labelledby="deleteHeading"><h2 id="deleteHeading">Permanently delete your BRB account?</h2><p>This permanently deletes your account, profile, messages, and associated member records. This cannot be undone. Do not use this to delete your administrator account.</p><label for="deleteConfirmText">Type <strong>DELETE MY ACCOUNT</strong> to confirm</label><input id="deleteConfirmText" type="text" autocomplete="off" spellcheck="false" aria-describedby="deleteStatus"/><p id="deleteStatus" role="status" aria-live="polite"></p><div class="dialog-actions"><button id="cancelDelete" class="minor-button" type="button">Keep my account</button><button id="confirmDelete" class="danger-button" type="button">Permanently delete account</button></div></dialog>
 </body>
 </html>
