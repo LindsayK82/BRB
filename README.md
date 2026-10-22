@@ -1,20 +1,15 @@
-# BRB — Rules acknowledgment (staged v1)
+# BRB — Turnstile Connected (staged)
 
-The web files keep the existing BRB pages and add the rules view and Cloudflare Turnstile client integration.
+Your public Cloudflare Turnstile SITE KEY has been configured in app.js. The SECRET is not included in these files; it must stay in Supabase as BRB_TURNSTILE_SECRET.
 
-## IMPORTANT: setup required before activation
-1. Create a Cloudflare Turnstile widget for your website domain (and localhost for local tests). Copy the PUBLIC site key into `BRB_TURNSTILE_SITE_KEY` near the top of `app.js`.
-2. In Supabase Project > Edge Functions > Secrets set `BRB_TURNSTILE_SECRET` to the PRIVATE Turnstile secret. Never put that secret in HTML, CSS, or JS.
-3. Update these four files in VS Code. Test the rules acceptance flow first in a staging environment.
-4. Only after site and secret keys are configured, turn on rules enforcement in database by setting `brb_private.rules_configuration.enforcement_enabled = true` in Supabase SQL Editor. This is intentionally OFF now to avoid locking out existing chat users.
-5. Existing users also need to acknowledge version 1 after rollout.
+## Testing
+1. Back up your current four files in VS Code. Replace index.html, app.js, styles.css with the copies in this ZIP (README is documentation).
+2. Load BRB from the hostname registered with Cloudflare Turnstile, not a file:// URL. Refresh with Ctrl+Shift+R.
+3. Log in as a verified test member. You should see the Community Rules agreement view.
+4. Check the rules box; complete the real Turnstile challenge; click Agree & enter chat.
+5. Sign out and log in again. A recorded acknowledgment should bypass the rules view.
+6. Test another unacknowledged account.
 
-## Verification checklist
-- CAPTCHA without checking agreement fails.
-- Agreement without CAPTCHA fails.
-- Valid verification saves record and permits posting.
-- Another browser without the acknowledgment cannot post.
-- Reloading does not prompt again once accepted.
-- Supabase does not accept direct chat INSERT before acknowledgment once enforcement is enabled.
+Database enforcement is intentionally OFF until end-to-end tests pass. The UI shows the rules gate to test it, but this is NOT a security guarantee until enforcement is switched ON in Supabase.
 
-Current status: backend tables, RPCs, and Edge Function deployed; enforcement remains disabled pending Turnstile credentials and end-to-end testing.
+If the Turnstile widget displays an invalid-sitekey or domain error, open app.js and verify the exact public site key and permitted hostnames from the Cloudflare dashboard. Do not paste the secret into any web file.
