@@ -5,7 +5,7 @@ const PROJECT_URL = 'https://upfukfioedmxazrdjbek.supabase.co';
 const PUBLISHABLE_KEY = 'sb_publishable__dlT-pOy59gUUMj4QB499Q_CdOtYKp8';
 const db = window.supabase.createClient(PROJECT_URL,PUBLISHABLE_KEY);
 // Turnstile SITE key is public. Add it only after creating a Cloudflare widget.
-const BRB_TURNSTILE_SITE_KEY = '0x4AAAAAAAFg_taCtftwtjO3F';
+const BRB_TURNSTILE_SITE_KEY = '0x4AAAAAAFg_taCtftwtjO3F';
 let rulesRequired=false, rulesAccepted=false, rulesCaptchaId=null;
 const ROOMS={Life:'The everyday stuff. The big stuff. Everything in between.',Music:'What are you listening to? Share the songs that stick.',Books:'One more chapter. Then maybe another.',Movies:'A good movie deserves a good conversation.'};
 const $=id=>document.getElementById(id);
