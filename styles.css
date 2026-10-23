@@ -67,3 +67,6 @@
 #bookPollAdminFields{display:grid;gap:8px}
 #bookPollAdminFields label{font-weight:700}
 #bookPollAdminFields input{width:100%;box-sizing:border-box}
+
+/* Member chat color preferences */
+#profileChatColor{width:100%;border:1px solid #c6c7b9;background:#fff;color:var(--forest);border-radius:8px;padding:12px 13px;font:inherit}
