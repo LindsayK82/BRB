@@ -9,7 +9,7 @@ const BRB_TURNSTILE_SITE_KEY = '0x4AAAAAAFg_taCtftwtjO3F';
 let rulesRequired=false, rulesAccepted=false, rulesCaptchaId=null;
 const ROOMS={Life:'The everyday stuff. The big stuff. Everything in between.',Music:'What are you listening to? Share the songs that stick.',Books:'One more chapter. Then maybe another.',Movies:'A good movie deserves a good conversation.'};
 const $=id=>document.getElementById(id);
-let user=null,profile=null,activeRoom='Life',channel=null, soundEnabled=false, roomVersion=0, isAdmin=false;
+let user=null,profile=null,activeRoom='Life',channel=null, soundEnabled=false, roomVersion=0, isAdmin=false, recoveryMode=false;
 const clock=s=>new Date(s).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'});
 // --- Message retention and visible notice ---
 // The Life timer counts down to the next visible message's individual expiry.
@@ -124,7 +124,7 @@ function showView(which){for(const name of ['welcome','chat','settings','contact
 function go(which){if(!user||!profile){showView('welcome');return;}if(which==='admin'&&!isAdmin)return;if(which==='chat'&&rulesRequired&&!rulesAccepted){showView('rules');renderRulesCaptcha();return;}showView(which);if(which==='chat')loadRoom();}
 for(const [id,view] of [['homeButton','chat'],['chatNav','chat'],['settingsNav','settings'],['contactNav','contact'],['accountButton','settings'],['adminNav','admin']])$(id).addEventListener('click',()=>go(view));
 $('signOutButton').addEventListener('click',async()=>{await leaveRoom();await db.auth.signOut();user=null;profile=null;isAdmin=false;$('adminNav').hidden=true;startLogin();});
-function startLogin(){ $('emailCodeForm').hidden=true;$('loginForm').hidden=false;$('usernameForm').hidden=true;$('signOutButton').hidden=true; $('headerUsername').textContent='Guest';showView('welcome');}
+function startLogin(){ recoveryMode=false;$('passwordRecoveryForm').hidden=true;$('emailCodeForm').hidden=true;$('loginForm').hidden=false;$('usernameForm').hidden=true;$('signOutButton').hidden=true; $('headerUsername').textContent='Guest';showView('welcome');}
 // --- Welcome email: server verifies the member and sends at most once ---
 async function requestWelcomeEmail(){
  try {
@@ -167,7 +167,7 @@ $('acceptRulesButton').addEventListener('click',async()=>{
  }catch(e){status('rulesStatus',e.message);window.turnstile?.reset(rulesCaptchaId);}
 });
 
-async function setupMember(sessionUser){user=sessionUser;void requestWelcomeEmail();await refreshRulesStatus();const {data,error}=await db.from('member_profiles').select('user_id,username,avatar_url').eq('user_id',user.id).maybeSingle();if(error){status('loginStatus',error.message);startLogin();return;}profile=data;isAdmin=sessionUser.app_metadata?.brb_role==='admin';$('adminNav').hidden=!isAdmin;if(!profile){$('loginForm').hidden=true;$('usernameForm').hidden=false;$('signOutButton').hidden=false;showView('welcome');return;}$('headerUsername').textContent=profile.username;$('signOutButton').hidden=false;go('chat');}
+async function setupMember(sessionUser){if(recoveryMode)return;user=sessionUser;void requestWelcomeEmail();await refreshRulesStatus();const {data,error}=await db.from('member_profiles').select('user_id,username,avatar_url').eq('user_id',user.id).maybeSingle();if(error){status('loginStatus',error.message);startLogin();return;}profile=data;isAdmin=sessionUser.app_metadata?.brb_role==='admin';$('adminNav').hidden=!isAdmin;if(!profile){$('loginForm').hidden=true;$('usernameForm').hidden=false;$('signOutButton').hidden=false;showView('welcome');return;}$('headerUsername').textContent=profile.username;$('signOutButton').hidden=false;go('chat');}
 $('loginForm').addEventListener('submit',async ev=>{ev.preventDefault();status('loginStatus','Signing in...');const {data,error}=await db.auth.signInWithPassword({email:$('loginEmail').value.trim(),password:$('loginPassword').value});if(error){status('loginStatus',error.message);return;}status('loginStatus','');await setupMember(data.user);});
 $('signupButton').addEventListener('click',async()=>{const email=$('loginEmail').value.trim(),password=$('loginPassword').value;if(!email||password.length<6){status('loginStatus','Enter an email and password (at least 6 characters) first.');return;}const {error}=await db.auth.signUp({email,password,options:{emailRedirectTo:'https://thebrbchat.com/'}});if(error){status('loginStatus',error.message);return;}
  $('verificationEmail').value=email;
@@ -193,6 +193,37 @@ $('emailCodeForm').addEventListener('submit',async event=>{
  finally{submit.disabled=false;}
 });
 $('backToSignInButton').addEventListener('click',()=>startLogin());
+// Supabase emits PASSWORD_RECOVERY after exchanging the email link for a recovery session.
+function showPasswordRecovery(){
+ recoveryMode=true;
+ $('loginForm').hidden=true;
+ $('emailCodeForm').hidden=true;
+ $('usernameForm').hidden=true;
+ $('passwordRecoveryForm').hidden=false;
+ $('signOutButton').hidden=true;
+ showView('welcome');
+ status('passwordRecoveryStatus','');
+}
+db.auth.onAuthStateChange((event)=>{
+ if(event==='PASSWORD_RECOVERY')showPasswordRecovery();
+});
+$('passwordRecoveryForm').addEventListener('submit',async event=>{
+ event.preventDefault();
+ const password=$('newRecoveryPassword').value;
+ if(password!==$('confirmRecoveryPassword').value){status('passwordRecoveryStatus','The passwords do not match.');return;}
+ if(password.length<6){status('passwordRecoveryStatus','Please use at least 6 characters.');return;}
+ const button=$('passwordRecoveryForm').querySelector('button[type="submit"]');
+ button.disabled=true;status('passwordRecoveryStatus','Updating your password…');
+ try{
+  const {error}=await db.auth.updateUser({password});
+  if(error)throw error;
+  status('passwordRecoveryStatus','Password updated! You can now sign in with your new password.');
+  await db.auth.signOut();
+  startLogin();
+  status('loginStatus','Password updated. Please sign in with your new password.');
+ }catch(error){status('passwordRecoveryStatus',error.message||'Password update failed.');}
+ finally{button.disabled=false;}
+});
 $('resetPasswordButton').addEventListener('click',async()=>{const email=$('loginEmail').value.trim();if(!email){status('loginStatus','Enter your email first.');return;}const {error}=await db.auth.resetPasswordForEmail(email,{redirectTo:'https://thebrbchat.com/'});status('loginStatus',error?error.message:'If that address has an account, password recovery instructions have been sent.');});
 $('usernameForm').addEventListener('submit',async ev=>{ev.preventDefault();const username=$('welcomeName').value.trim();if(!/^[A-Za-z0-9_]{3,30}$/.test(username)){status('usernameStatus','Use 3–30 letters, numbers, or underscores.');return;}const {error}=await db.from('member_profiles').insert({user_id:user.id,username});if(error){status('usernameStatus',error.code==='23505'?'That username is taken. Please try another.':error.message);return;}await setupMember(user);});
 function clearChat(){const box=$('messages');box.replaceChildren();return box;}
@@ -236,8 +267,8 @@ async function reportMessage(m){
  if(error){alert(error.code==='23505'?'You have already reported this comment.':'Unable to submit report: '+error.message);return;}
  alert('Report submitted privately. Thank you. The administrator will review it. No stars were deducted automatically.');
 }
-async function leaveRoom(){if(channel){const old=channel;channel=null;await db.removeChannel(old);}}
-async function loadRoom(){if(!user||!profile)return;const serial=++roomVersion;await leaveRoom();if(serial!==roomVersion)return;const room=activeRoom.toLowerCase();$('roomTitle').textContent=activeRoom;$('roomDescription').textContent=ROOMS[activeRoom];$('roomPanel').setAttribute('aria-labelledby','tab-'+activeRoom);nextLifeExpiry=null;updateRetentionNotice();$('booksBanner').hidden=activeRoom!=='Books';if(activeRoom==='Books'){void loadBookClubBanner();void renderBookPoll();}else $('bookPollPanel').hidden=true;document.querySelectorAll('.room-tab').forEach(tab=>{const active=tab.dataset.room===activeRoom;tab.classList.toggle('active',active);tab.setAttribute('aria-selected',String(active));tab.tabIndex=active?0:-1;});clearChat();addText($('messages'),'Welcome to '+activeRoom+'. Pull up a chair.','system-message');const cutoff=new Date(Date.now()-(room==='life'?24:168)*3600000).toISOString();const {data:messages,error}=await db.from('chat_messages').select('id,room_id,author_id,body,created_at').eq('room_id',room).gte('created_at',cutoff).order('created_at',{ascending:true}).limit(200);if(serial!==roomVersion)return;if(error){addText($('messages'),error.message,'system-message');return;}const ids=[...new Set(messages.map(m=>m.author_id))];let names={};if(ids.length){const result=await db.from('member_profiles').select('user_id,username').in('user_id',ids);for(const p of result.data||[])names[p.user_id]=p.username;}if(serial!==roomVersion)return;if(room==='life'&&messages.length){nextLifeExpiry=Math.min(...messages.map(m=>new Date(m.created_at).getTime()+24*3600000));updateRetentionNotice();}for(const m of messages)drawMessage(m,names);$('messages').scrollTop=$('messages').scrollHeight;channel=db.channel('brb-room-'+room,{config:{presence:{key:user.id}}});channel.on('presence',{event:'sync'},()=>renderMembers()).on('postgres_changes',{event:'INSERT',schema:'public',table:'chat_messages',filter:'room_id=eq.'+room},async payload=>{if(serial!==roomVersion)return;const m=payload.new;let username=profile.username;if(m.author_id!==user.id){const r=await db.from('member_profiles').select('username').eq('user_id',m.author_id).maybeSingle();username=r.data?.username||'Member';}drawMessage(m,{[m.author_id]:username});if(room==='life'){nextLifeExpiry=Math.min(nextLifeExpiry??Infinity,new Date(m.created_at).getTime()+24*3600000);updateRetentionNotice();}$('messages').scrollTop=$('messages').scrollHeight;}).subscribe(async state=>{if(state==='SUBSCRIBED'&&serial===roomVersion)await channel.track({username:profile.username});});renderMembers();}
+async function leaveRoom(){if(channel){const old=channel;channel=null;renderMembers();await db.removeChannel(old);}}
+async function loadRoom(){if(!user||!profile)return;const serial=++roomVersion;await leaveRoom();if(serial!==roomVersion)return;const room=activeRoom.toLowerCase();$('roomTitle').textContent=activeRoom;$('roomDescription').textContent=ROOMS[activeRoom];$('roomPanel').setAttribute('aria-labelledby','tab-'+activeRoom);nextLifeExpiry=null;updateRetentionNotice();$('booksBanner').hidden=activeRoom!=='Books';if(activeRoom==='Books'){void loadBookClubBanner();void renderBookPoll();}else $('bookPollPanel').hidden=true;document.querySelectorAll('.room-tab').forEach(tab=>{const active=tab.dataset.room===activeRoom;tab.classList.toggle('active',active);tab.setAttribute('aria-selected',String(active));tab.tabIndex=active?0:-1;});clearChat();addText($('messages'),'Welcome to '+activeRoom+'. Pull up a chair.','system-message');const cutoff=new Date(Date.now()-(room==='life'?24:168)*3600000).toISOString();const {data:messages,error}=await db.from('chat_messages').select('id,room_id,author_id,body,created_at').eq('room_id',room).gte('created_at',cutoff).order('created_at',{ascending:true}).limit(200);if(serial!==roomVersion)return;if(error){addText($('messages'),error.message,'system-message');return;}const ids=[...new Set(messages.map(m=>m.author_id))];let names={};if(ids.length){const result=await db.from('member_profiles').select('user_id,username').in('user_id',ids);for(const p of result.data||[])names[p.user_id]=p.username;}if(serial!==roomVersion)return;if(room==='life'&&messages.length){nextLifeExpiry=Math.min(...messages.map(m=>new Date(m.created_at).getTime()+24*3600000));updateRetentionNotice();}for(const m of messages)drawMessage(m,names);$('messages').scrollTop=$('messages').scrollHeight;const roomChannel=db.channel('brb-room-'+room,{config:{presence:{key:user.id}}});channel=roomChannel;roomChannel.on('presence',{event:'sync'},()=>{if(serial===roomVersion&&channel===roomChannel)renderMembers();}).on('postgres_changes',{event:'INSERT',schema:'public',table:'chat_messages',filter:'room_id=eq.'+room},async payload=>{if(serial!==roomVersion)return;const m=payload.new;let username=profile.username;if(m.author_id!==user.id){const r=await db.from('member_profiles').select('username').eq('user_id',m.author_id).maybeSingle();username=r.data?.username||'Member';}drawMessage(m,{[m.author_id]:username});if(room==='life'){nextLifeExpiry=Math.min(nextLifeExpiry??Infinity,new Date(m.created_at).getTime()+24*3600000);updateRetentionNotice();}$('messages').scrollTop=$('messages').scrollHeight;}).subscribe(async state=>{if(state==='SUBSCRIBED'&&serial===roomVersion&&channel===roomChannel){const {error:presenceError}=await roomChannel.track({username:profile.username});if(presenceError)console.warn('Presence tracking failed:',presenceError.message);renderMembers();}});renderMembers();}
 // Email dispatch is admin-authenticated server-side; the Resend key never enters this browser.
 async function dispatchModerationEmails(){
  if(!isAdmin)return;
@@ -452,4 +483,4 @@ $('confirmDelete').addEventListener('click',async()=>{
 $('cancelDelete').addEventListener('click',()=>$('deleteDialog').close());
 $('soundToggle').addEventListener('click',()=>{soundEnabled=!soundEnabled;$('soundToggle').setAttribute('aria-pressed',String(soundEnabled));$('soundToggle').title=soundEnabled?'Audio effects coming later':'Sound effects off';$('soundToggle').querySelector('.mute-slash').hidden=soundEnabled;});
 $('year').textContent=new Date().getFullYear();
-(async()=>{const {data}=await db.auth.getUser();if(data.user)await setupMember(data.user);else startLogin();})();
+(async()=>{const {data}=await db.auth.getUser();if(recoveryMode)return;if(data.user)await setupMember(data.user);else startLogin();})();
