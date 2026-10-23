@@ -365,7 +365,28 @@ function renderMembers(){const listed=new Map();if(channel){for(const [id,states
 function changeRoom(room){if(!ROOMS[room])return;activeRoom=room;loadRoom();}
 for(const tab of document.querySelectorAll('.room-tab')){tab.addEventListener('click',()=>changeRoom(tab.dataset.room));tab.addEventListener('keydown',ev=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(ev.key))return;ev.preventDefault();const rooms=Object.keys(ROOMS);const i=rooms.indexOf(activeRoom);const next=ev.key==='Home'?0:ev.key==='End'?rooms.length-1:(i+(ev.key==='ArrowLeft'?-1:1)+rooms.length)%rooms.length;changeRoom(rooms[next]);$('tab-'+rooms[next]).focus();});}
 $('messageInput').addEventListener('input',()=>{$('messageCount').textContent=$('messageInput').value.length+' / 500';});
-$('messageForm').addEventListener('submit',async ev=>{ev.preventDefault();if(!user||!profile)return;if(rulesRequired&&!rulesAccepted){go('chat');return;}const body=$('messageInput').value.trim();if(!body)return;const {error}=await db.from('chat_messages').insert({room_id:activeRoom.toLowerCase(),author_id:user.id,body});if(error){alert('Message not sent: '+error.message);return;}$('messageInput').value='';$('messageCount').textContent='0 / 500';});
+$('messageForm').addEventListener('submit',async ev=>{ev.preventDefault();if(!user||!profile)return;if(rulesRequired&&!rulesAccepted){go('chat');return;}const body=$('messageInput').value.trim();if(!body)return;const {error}=await db.from('chat_messages').insert({room_id:activeRoom.toLowerCase(),author_id:user.id,body});if(error){
+ let message='Your message could not be sent. Please try again.';
+ const lower=(error.message||'').toLowerCase();
+ if(lower.includes('row-level security')||lower.includes('permission denied')||error.code==='42501'){
+  const {data:identity, error:authError}=await db.auth.getUser();
+  if(authError||!identity?.user){
+   message='Your account session is no longer active. Please sign in again.';
+  }else{
+   const {data:standing}=await db.from('member_standing').select('stars').eq('user_id',identity.user.id).maybeSingle();
+   if(standing&&standing.stars===0)message='Your account is currently suspended from posting. You can review your moderation history in Settings.';
+   else{
+    const {data:rules}=await db.rpc('brb_my_rules_status');
+    if(rules&&Number(rules.accepted_version||0)<Number(rules.required_version||1))message='Please accept the current community rules before posting.';
+    else message='You do not currently have permission to post. Please sign in again or contact support@thebrbchat.com.';
+   }
+  }
+ }
+ $('messageSendStatus').textContent=message;
+ return;
+}
+$('messageSendStatus').textContent='';
+$('messageInput').value='';$('messageCount').textContent='0 / 500';});
 $('membersToggle').addEventListener('click',()=>{const visible=$('memberSidebar').classList.toggle('open');$('membersToggle').setAttribute('aria-expanded',String(visible));});
 // Book club archive: read-only monthly discussions preserved independently of room retention.
 async function renderBookArchive(){
