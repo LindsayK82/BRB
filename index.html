@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.79.0/dist/umd/supabase.min.js" defer></script>
   <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
-  <script src="app.js?v=20261023-authredirect1" defer></script>
+  <script src="app.js?v=20261023-otp1" defer></script>
 </head>
 <body>
   <!-- Header / primary navigation -->
@@ -42,6 +42,18 @@
           <button type="button" class="minor-button" id="signupButton">Create a new account</button>
           <button type="button" class="text-button" id="resetPasswordButton">Forgot your password?</button>
           <p id="loginStatus" class="form-status" role="status"></p>
+        </form>
+        <!-- Email confirmation code: no email links or redirects required -->
+        <form id="emailCodeForm" class="form-stack" hidden>
+          <h2>Verify your email</h2>
+          <p>Enter the six-digit code we sent to your inbox.</p>
+          <label for="verificationEmail">Email address</label>
+          <input id="verificationEmail" type="email" autocomplete="email" required />
+          <label for="verificationCode">Six-digit verification code</label>
+          <input id="verificationCode" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required placeholder="123456" />
+          <button class="primary-button" type="submit">Verify email →</button>
+          <button class="minor-button" id="backToSignInButton" type="button">Back to sign in</button>
+          <p id="verificationStatus" class="form-status" role="status" aria-live="polite"></p>
         </form>
         <form id="usernameForm" class="form-stack" hidden>
           <label for="welcomeName">Choose your username (3–30 letters, numbers, or underscores)</label>
