@@ -40,6 +40,8 @@ function upcomingBookClubDate(){
  function lastSaturday(y,m){const last=new Date(Date.UTC(y,m,0));return last.getUTCDate()-((last.getUTCDay()+1)%7);}
  let y=year,m=month,d=lastSaturday(y,m);
  if(day>d){m++;if(m>12){m=1;y++;}d=lastSaturday(y,m);}
+ // The inaugural BRB discussion is November 28, 2026.
+ if(y===2026&&m<11){m=11;d=28;}
  return [y,String(m).padStart(2,'0'),String(d).padStart(2,'0')].join('-');
 }
 function bookClubFriendlyDate(iso){const [y,m,d]=iso.split('-').map(Number);return new Intl.DateTimeFormat('en-US',{month:'long',day:'numeric',year:'numeric',timeZone:'UTC'}).format(new Date(Date.UTC(y,m-1,d)));}
