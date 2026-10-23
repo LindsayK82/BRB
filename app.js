@@ -73,7 +73,9 @@ async function renderBookPoll(){
  const list=$('bookPollChoices');list.replaceChildren();if(!poll){panel.hidden=true;return;}bookPollId=poll.id;
  const {data:options,error}=await db.from('book_club_poll_options').select('id,book_title,slot').eq('poll_id',poll.id).order('slot');
  if(error){$('bookPollStatus').textContent='Poll is unavailable right now.';return;}
- const today=new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+ const dateParts=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
+ const datePart=type=>dateParts.find(x=>x.type===type).value;
+ const today=datePart('year')+'-'+datePart('month')+'-'+datePart('day');
  const open=today>='2026-11-01'&&today<='2026-11-07';
  $('bookPollSummary').textContent=open?'November 1–7 · Choose one book. Winner: December; runner-up: January.':'November 1–7 · Winner: December; runner-up: January.';
  if(!options?.length){$('bookPollStatus').textContent='Five book choices will be announced before voting opens.';return;}
