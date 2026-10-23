@@ -63,8 +63,61 @@ $('bookClubForm').addEventListener('submit',async ev=>{
  if(!error)await loadBookClubBanner();
 });
 
+
+// --- Book club ballot (one signed-in member vote per monthly poll) ---
+let bookPollId=null;
+async function renderBookPoll(){
+ const panel=$('bookPollPanel');panel.hidden=activeRoom!=='Books';
+ if(panel.hidden||!user)return;
+ const {data:poll}=await db.from('book_club_polls').select('id,poll_month,finalized_at').eq('poll_month','2026-11-01').maybeSingle();
+ const list=$('bookPollChoices');list.replaceChildren();if(!poll){panel.hidden=true;return;}bookPollId=poll.id;
+ const {data:options,error}=await db.from('book_club_poll_options').select('id,book_title,slot').eq('poll_id',poll.id).order('slot');
+ if(error){$('bookPollStatus').textContent='Poll is unavailable right now.';return;}
+ const today=new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+ const open=today>='2026-11-01'&&today<='2026-11-07';
+ $('bookPollSummary').textContent=open?'November 1–7 · Choose one book. Winner: December; runner-up: January.':'November 1–7 · Winner: December; runner-up: January.';
+ if(!options?.length){$('bookPollStatus').textContent='Five book choices will be announced before voting opens.';return;}
+ const {data:mine}=await db.from('book_club_poll_votes').select('option_id').eq('poll_id',poll.id).eq('voter_id',user.id).maybeSingle();
+ for(const option of options){
+  const label=document.createElement('label');label.className='poll-choice';
+  const input=document.createElement('input');input.type='radio';input.name='bookClubVote';input.value=option.id;input.checked=mine?.option_id===option.id;input.disabled=!open||options.length!==5;
+  const title=document.createElement('span');title.textContent=option.book_title;label.append(input,title);list.append(label);
+  input.addEventListener('change',async()=>{
+   if(!open)return;
+   $('bookPollStatus').textContent='Recording your vote…';
+   if(mine){const removed=await db.from('book_club_poll_votes').delete().eq('poll_id',poll.id).eq('voter_id',user.id);if(removed.error){$('bookPollStatus').textContent=removed.error.message;return;}}
+   const {error:voteError}=await db.from('book_club_poll_votes').insert({poll_id:poll.id,option_id:option.id,voter_id:user.id});
+   $('bookPollStatus').textContent=voteError?'Vote could not be saved: '+voteError.message:'Your vote is saved. Thanks for helping choose our next read!';
+  });
+ }
+ if(!open)$('bookPollStatus').textContent=today<'2026-11-01'?'Voting opens November 1.':'Voting has closed.';
+ else $('bookPollStatus').textContent=mine?'Your vote is saved. You may change it before November 8.':'Choose one book to cast your vote.';
+}
+async function loadPollAdmin(){
+ if(!isAdmin)return;
+ const {data:poll}=await db.from('book_club_polls').select('id').eq('poll_month','2026-11-01').maybeSingle();if(!poll)return;
+ const {data:options}=await db.from('book_club_poll_options').select('slot,book_title').eq('poll_id',poll.id);
+ const area=$('bookPollAdminFields');area.replaceChildren();
+ for(let slot=1;slot<=5;slot++){
+  const label=document.createElement('label');label.textContent='Choice '+slot;
+  const input=document.createElement('input');input.required=true;input.maxLength=160;input.dataset.slot=slot;
+  input.value=options?.find(x=>x.slot===slot)?.book_title||'';
+  area.append(label,input);
+ }
+}
+$('bookPollAdminForm').addEventListener('submit',async event=>{
+ event.preventDefault();if(!isAdmin)return;
+ const {data:poll}=await db.from('book_club_polls').select('id').eq('poll_month','2026-11-01').single();
+ if(!poll){status('bookPollAdminStatus','Poll not configured.');return;}
+ const items=[...$('bookPollAdminFields').querySelectorAll('input')].map(e=>({poll_id:poll.id,slot:Number(e.dataset.slot),book_title:e.value.trim()}));
+ if(items.some(x=>!x.book_title)||new Set(items.map(x=>x.book_title.toLowerCase())).size!==5){status('bookPollAdminStatus','Please enter five different book titles.');return;}
+ const {error}=await db.from('book_club_poll_options').upsert(items,{onConflict:'poll_id,slot'});
+ status('bookPollAdminStatus',error?'Unable to save: '+error.message:'Five book choices saved!');
+ if(!error&&activeRoom==='Books')void renderBookPoll();
+});
+
 function status(id,msg){$(id).textContent=msg;}
-function showView(which){for(const name of ['welcome','chat','settings','contact','archive','admin','rules'])$(name+'View').hidden=name!==which; const nav=which==='archive'?'chat':which;for(const key of ['chat','settings','contact','admin'])$(key+'Nav').classList.toggle('selected',nav===key);if(which==='settings')renderProfile();if(which==='admin'&&isAdmin){renderAdmin();void loadBookClubBanner();}}
+function showView(which){for(const name of ['welcome','chat','settings','contact','archive','admin','rules'])$(name+'View').hidden=name!==which; const nav=which==='archive'?'chat':which;for(const key of ['chat','settings','contact','admin'])$(key+'Nav').classList.toggle('selected',nav===key);if(which==='settings')renderProfile();if(which==='admin'&&isAdmin){renderAdmin();void loadBookClubBanner();void loadPollAdmin();}}
 function go(which){if(!user||!profile){showView('welcome');return;}if(which==='admin'&&!isAdmin)return;if(which==='chat'&&rulesRequired&&!rulesAccepted){showView('rules');renderRulesCaptcha();return;}showView(which);if(which==='chat')loadRoom();}
 for(const [id,view] of [['homeButton','chat'],['chatNav','chat'],['settingsNav','settings'],['contactNav','contact'],['accountButton','settings'],['adminNav','admin']])$(id).addEventListener('click',()=>go(view));
 $('signOutButton').addEventListener('click',async()=>{await leaveRoom();await db.auth.signOut();user=null;profile=null;isAdmin=false;$('adminNav').hidden=true;startLogin();});
@@ -158,7 +211,7 @@ async function reportMessage(m){
  alert('Report submitted privately. Thank you. The administrator will review it. No stars were deducted automatically.');
 }
 async function leaveRoom(){if(channel){const old=channel;channel=null;await db.removeChannel(old);}}
-async function loadRoom(){if(!user||!profile)return;const serial=++roomVersion;await leaveRoom();if(serial!==roomVersion)return;const room=activeRoom.toLowerCase();$('roomTitle').textContent=activeRoom;$('roomDescription').textContent=ROOMS[activeRoom];$('roomPanel').setAttribute('aria-labelledby','tab-'+activeRoom);nextLifeExpiry=null;updateRetentionNotice();$('booksBanner').hidden=activeRoom!=='Books';if(activeRoom==='Books')void loadBookClubBanner();document.querySelectorAll('.room-tab').forEach(tab=>{const active=tab.dataset.room===activeRoom;tab.classList.toggle('active',active);tab.setAttribute('aria-selected',String(active));tab.tabIndex=active?0:-1;});clearChat();addText($('messages'),'Welcome to '+activeRoom+'. Pull up a chair.','system-message');const cutoff=new Date(Date.now()-(room==='life'?24:168)*3600000).toISOString();const {data:messages,error}=await db.from('chat_messages').select('id,room_id,author_id,body,created_at').eq('room_id',room).gte('created_at',cutoff).order('created_at',{ascending:true}).limit(200);if(serial!==roomVersion)return;if(error){addText($('messages'),error.message,'system-message');return;}const ids=[...new Set(messages.map(m=>m.author_id))];let names={};if(ids.length){const result=await db.from('member_profiles').select('user_id,username').in('user_id',ids);for(const p of result.data||[])names[p.user_id]=p.username;}if(serial!==roomVersion)return;if(room==='life'&&messages.length){nextLifeExpiry=Math.min(...messages.map(m=>new Date(m.created_at).getTime()+24*3600000));updateRetentionNotice();}for(const m of messages)drawMessage(m,names);$('messages').scrollTop=$('messages').scrollHeight;channel=db.channel('brb-room-'+room,{config:{presence:{key:user.id}}});channel.on('presence',{event:'sync'},()=>renderMembers()).on('postgres_changes',{event:'INSERT',schema:'public',table:'chat_messages',filter:'room_id=eq.'+room},async payload=>{if(serial!==roomVersion)return;const m=payload.new;let username=profile.username;if(m.author_id!==user.id){const r=await db.from('member_profiles').select('username').eq('user_id',m.author_id).maybeSingle();username=r.data?.username||'Member';}drawMessage(m,{[m.author_id]:username});if(room==='life'){nextLifeExpiry=Math.min(nextLifeExpiry??Infinity,new Date(m.created_at).getTime()+24*3600000);updateRetentionNotice();}$('messages').scrollTop=$('messages').scrollHeight;}).subscribe(async state=>{if(state==='SUBSCRIBED'&&serial===roomVersion)await channel.track({username:profile.username});});renderMembers();}
+async function loadRoom(){if(!user||!profile)return;const serial=++roomVersion;await leaveRoom();if(serial!==roomVersion)return;const room=activeRoom.toLowerCase();$('roomTitle').textContent=activeRoom;$('roomDescription').textContent=ROOMS[activeRoom];$('roomPanel').setAttribute('aria-labelledby','tab-'+activeRoom);nextLifeExpiry=null;updateRetentionNotice();$('booksBanner').hidden=activeRoom!=='Books';if(activeRoom==='Books'){void loadBookClubBanner();void renderBookPoll();}else $('bookPollPanel').hidden=true;document.querySelectorAll('.room-tab').forEach(tab=>{const active=tab.dataset.room===activeRoom;tab.classList.toggle('active',active);tab.setAttribute('aria-selected',String(active));tab.tabIndex=active?0:-1;});clearChat();addText($('messages'),'Welcome to '+activeRoom+'. Pull up a chair.','system-message');const cutoff=new Date(Date.now()-(room==='life'?24:168)*3600000).toISOString();const {data:messages,error}=await db.from('chat_messages').select('id,room_id,author_id,body,created_at').eq('room_id',room).gte('created_at',cutoff).order('created_at',{ascending:true}).limit(200);if(serial!==roomVersion)return;if(error){addText($('messages'),error.message,'system-message');return;}const ids=[...new Set(messages.map(m=>m.author_id))];let names={};if(ids.length){const result=await db.from('member_profiles').select('user_id,username').in('user_id',ids);for(const p of result.data||[])names[p.user_id]=p.username;}if(serial!==roomVersion)return;if(room==='life'&&messages.length){nextLifeExpiry=Math.min(...messages.map(m=>new Date(m.created_at).getTime()+24*3600000));updateRetentionNotice();}for(const m of messages)drawMessage(m,names);$('messages').scrollTop=$('messages').scrollHeight;channel=db.channel('brb-room-'+room,{config:{presence:{key:user.id}}});channel.on('presence',{event:'sync'},()=>renderMembers()).on('postgres_changes',{event:'INSERT',schema:'public',table:'chat_messages',filter:'room_id=eq.'+room},async payload=>{if(serial!==roomVersion)return;const m=payload.new;let username=profile.username;if(m.author_id!==user.id){const r=await db.from('member_profiles').select('username').eq('user_id',m.author_id).maybeSingle();username=r.data?.username||'Member';}drawMessage(m,{[m.author_id]:username});if(room==='life'){nextLifeExpiry=Math.min(nextLifeExpiry??Infinity,new Date(m.created_at).getTime()+24*3600000);updateRetentionNotice();}$('messages').scrollTop=$('messages').scrollHeight;}).subscribe(async state=>{if(state==='SUBSCRIBED'&&serial===roomVersion)await channel.track({username:profile.username});});renderMembers();}
 // Email dispatch is admin-authenticated server-side; the Resend key never enters this browser.
 async function dispatchModerationEmails(){
  if(!isAdmin)return;
