@@ -124,7 +124,7 @@ function showView(which){for(const name of ['welcome','chat','settings','contact
 function go(which){if(!user||!profile){showView('welcome');return;}if(which==='admin'&&!isAdmin)return;if(which==='chat'&&rulesRequired&&!rulesAccepted){showView('rules');renderRulesCaptcha();return;}showView(which);if(which==='chat')loadRoom();}
 for(const [id,view] of [['homeButton','chat'],['chatNav','chat'],['settingsNav','settings'],['contactNav','contact'],['accountButton','settings'],['adminNav','admin']])$(id).addEventListener('click',()=>go(view));
 $('signOutButton').addEventListener('click',async()=>{await leaveRoom();await db.auth.signOut();user=null;profile=null;isAdmin=false;$('adminNav').hidden=true;startLogin();});
-function startLogin(){ $('loginForm').hidden=false;$('usernameForm').hidden=true;$('signOutButton').hidden=true; $('headerUsername').textContent='Guest';showView('welcome');}
+function startLogin(){ $('emailCodeForm').hidden=true;$('loginForm').hidden=false;$('usernameForm').hidden=true;$('signOutButton').hidden=true; $('headerUsername').textContent='Guest';showView('welcome');}
 // --- Welcome email: server verifies the member and sends at most once ---
 async function requestWelcomeEmail(){
  try {
@@ -169,7 +169,30 @@ $('acceptRulesButton').addEventListener('click',async()=>{
 
 async function setupMember(sessionUser){user=sessionUser;void requestWelcomeEmail();await refreshRulesStatus();const {data,error}=await db.from('member_profiles').select('user_id,username,avatar_url').eq('user_id',user.id).maybeSingle();if(error){status('loginStatus',error.message);startLogin();return;}profile=data;isAdmin=sessionUser.app_metadata?.brb_role==='admin';$('adminNav').hidden=!isAdmin;if(!profile){$('loginForm').hidden=true;$('usernameForm').hidden=false;$('signOutButton').hidden=false;showView('welcome');return;}$('headerUsername').textContent=profile.username;$('signOutButton').hidden=false;go('chat');}
 $('loginForm').addEventListener('submit',async ev=>{ev.preventDefault();status('loginStatus','Signing in...');const {data,error}=await db.auth.signInWithPassword({email:$('loginEmail').value.trim(),password:$('loginPassword').value});if(error){status('loginStatus',error.message);return;}status('loginStatus','');await setupMember(data.user);});
-$('signupButton').addEventListener('click',async()=>{const email=$('loginEmail').value.trim(),password=$('loginPassword').value;if(!email||password.length<6){status('loginStatus','Enter an email and password (at least 6 characters) first.');return;}const {error}=await db.auth.signUp({email,password,options:{emailRedirectTo:'https://lindsayk82.github.io/BRB/'}});status('loginStatus',error?error.message:'Check your email for a verification link, then sign in.');});
+$('signupButton').addEventListener('click',async()=>{const email=$('loginEmail').value.trim(),password=$('loginPassword').value;if(!email||password.length<6){status('loginStatus','Enter an email and password (at least 6 characters) first.');return;}const {error}=await db.auth.signUp({email,password,options:{emailRedirectTo:'https://lindsayk82.github.io/BRB/'}});if(error){status('loginStatus',error.message);return;}
+ $('verificationEmail').value=email;
+ $('verificationCode').value='';
+ $('loginForm').hidden=true;
+ $('emailCodeForm').hidden=false;
+ status('verificationStatus','Check your email for your six-digit confirmation code.');});
+// Confirm signup directly in BRB; successful verification creates a signed-in session.
+$('emailCodeForm').addEventListener('submit',async event=>{
+ event.preventDefault();
+ const email=$('verificationEmail').value.trim(),token=$('verificationCode').value.trim();
+ if(!/^[0-9]{6}$/.test(token)){status('verificationStatus','Enter the six digits from your email.');return;}
+ const submit=$('emailCodeForm').querySelector('button[type="submit"]');
+ submit.disabled=true;status('verificationStatus','Verifying your email…');
+ try{
+  const {data,error}=await db.auth.verifyOtp({email,token,type:'signup'});
+  if(error)throw error;
+  if(!data.user)throw Error('Verification succeeded, but sign-in did not complete. Please sign in normally.');
+  $('emailCodeForm').hidden=true;
+  status('verificationStatus','Email confirmed!');
+  await setupMember(data.user);
+ }catch(error){status('verificationStatus',error.message||'Code could not be verified.');}
+ finally{submit.disabled=false;}
+});
+$('backToSignInButton').addEventListener('click',()=>startLogin());
 $('resetPasswordButton').addEventListener('click',async()=>{const email=$('loginEmail').value.trim();if(!email){status('loginStatus','Enter your email first.');return;}const {error}=await db.auth.resetPasswordForEmail(email,{redirectTo:'https://lindsayk82.github.io/BRB/'});status('loginStatus',error?error.message:'If that address has an account, password recovery instructions have been sent.');});
 $('usernameForm').addEventListener('submit',async ev=>{ev.preventDefault();const username=$('welcomeName').value.trim();if(!/^[A-Za-z0-9_]{3,30}$/.test(username)){status('usernameStatus','Use 3–30 letters, numbers, or underscores.');return;}const {error}=await db.from('member_profiles').insert({user_id:user.id,username});if(error){status('usernameStatus',error.code==='23505'?'That username is taken. Please try another.':error.message);return;}await setupMember(user);});
 function clearChat(){const box=$('messages');box.replaceChildren();return box;}
