@@ -193,6 +193,15 @@
             <label for="profileName">Username</label><input id="profileName" minlength="2" maxlength="24" required />
             <label for="profileEmail">Email <span class="private-label">PRIVATE</span></label><input type="email" id="profileEmail" placeholder="you@example.com" autocomplete="email" />
             <p class="field-help">Your email is not included in your public profile.</p>
+            <label for="profileChatColor">Chat color</label>
+            <select id="profileChatColor" aria-describedby="chatColorHelp">
+              <option value="forest">Forest Green</option>
+              <option value="blue">Deep Blue</option>
+              <option value="plum">Plum</option>
+              <option value="terracotta">Terracotta</option>
+              <option value="charcoal">Charcoal</option>
+            </select>
+            <p class="field-help" id="chatColorHelp">Changes the color of your username and messages, including older conversations.</p>
             <button type="submit" class="primary-button fit-button">Save changes</button>
             <p class="form-status" id="profileStatus" role="status"></p>
           </form>
