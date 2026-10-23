@@ -90,6 +90,7 @@ async function renderBookPoll(){
    if(mine){const removed=await db.from('book_club_poll_votes').delete().eq('poll_id',poll.id).eq('voter_id',user.id);if(removed.error){$('bookPollStatus').textContent=removed.error.message;return;}}
    const {error:voteError}=await db.from('book_club_poll_votes').insert({poll_id:poll.id,option_id:option.id,voter_id:user.id});
    $('bookPollStatus').textContent=voteError?'Vote could not be saved: '+voteError.message:'Your vote is saved. Thanks for helping choose our next read!';
+   if(!voteError)void renderBookPoll();
   });
  }
  if(!open)$('bookPollStatus').textContent=today<'2026-11-01'?'Voting opens November 1.':'Voting has closed.';
