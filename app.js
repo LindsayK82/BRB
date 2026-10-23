@@ -30,8 +30,39 @@ function updateRetentionNotice(){
 }
 setInterval(updateRetentionNotice,60000);
 
+
+// --- Monthly book club banner and administrator-editable reading selection ---
+// Dates are calculated in Eastern time, including daylight saving transitions.
+function upcomingBookClubDate(){
+ const parts=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',year:'numeric',month:'numeric',day:'numeric'}).formatToParts(new Date());
+ const part=t=>Number(parts.find(p=>p.type===t).value);
+ const year=part('year'),month=part('month'),day=part('day');
+ function lastSaturday(y,m){const last=new Date(Date.UTC(y,m,0));return last.getUTCDate()-((last.getUTCDay()+1)%7);}
+ let y=year,m=month,d=lastSaturday(y,m);
+ if(day>d){m++;if(m>12){m=1;y++;}d=lastSaturday(y,m);}
+ return [y,String(m).padStart(2,'0'),String(d).padStart(2,'0')].join('-');
+}
+function bookClubFriendlyDate(iso){const [y,m,d]=iso.split('-').map(Number);return new Intl.DateTimeFormat('en-US',{month:'long',day:'numeric',year:'numeric',timeZone:'UTC'}).format(new Date(Date.UTC(y,m-1,d)));}
+async function loadBookClubBanner(){
+ const date=upcomingBookClubDate();
+ $('bookClubDate').textContent=bookClubFriendlyDate(date)+' · 8 AM–8 PM Eastern';
+ $('bookClubSelection').textContent='Book selection coming soon';
+ const {data,error}=await db.from('book_club_schedule').select('book_title').eq('event_date',date).maybeSingle();
+ if(!error&&data?.book_title)$('bookClubSelection').textContent='Reading: '+data.book_title;
+ if(isAdmin){$('bookClubAdminDate').textContent='Upcoming discussion: '+bookClubFriendlyDate(date);$('bookClubTitleInput').value=data?.book_title||'';}
+}
+$('bookClubForm').addEventListener('submit',async ev=>{
+ ev.preventDefault();if(!isAdmin)return;
+ const title=$('bookClubTitleInput').value.trim();
+ if(!title){status('bookClubSaveStatus','Enter a book title first.');return;}
+ const date=upcomingBookClubDate();
+ const {error}=await db.from('book_club_schedule').upsert({event_date:date,book_title:title,updated_at:new Date().toISOString()},{onConflict:'event_date'});
+ status('bookClubSaveStatus',error?'Unable to save: '+error.message:'Saved! The Books room banner is updated.');
+ if(!error)await loadBookClubBanner();
+});
+
 function status(id,msg){$(id).textContent=msg;}
-function showView(which){for(const name of ['welcome','chat','settings','contact','archive','admin','rules'])$(name+'View').hidden=name!==which; const nav=which==='archive'?'chat':which;for(const key of ['chat','settings','contact','admin'])$(key+'Nav').classList.toggle('selected',nav===key);if(which==='settings')renderProfile();if(which==='admin'&&isAdmin)renderAdmin();}
+function showView(which){for(const name of ['welcome','chat','settings','contact','archive','admin','rules'])$(name+'View').hidden=name!==which; const nav=which==='archive'?'chat':which;for(const key of ['chat','settings','contact','admin'])$(key+'Nav').classList.toggle('selected',nav===key);if(which==='settings')renderProfile();if(which==='admin'&&isAdmin){renderAdmin();void loadBookClubBanner();}}
 function go(which){if(!user||!profile){showView('welcome');return;}if(which==='admin'&&!isAdmin)return;if(which==='chat'&&rulesRequired&&!rulesAccepted){showView('rules');renderRulesCaptcha();return;}showView(which);if(which==='chat')loadRoom();}
 for(const [id,view] of [['homeButton','chat'],['chatNav','chat'],['settingsNav','settings'],['contactNav','contact'],['accountButton','settings'],['adminNav','admin']])$(id).addEventListener('click',()=>go(view));
 $('signOutButton').addEventListener('click',async()=>{await leaveRoom();await db.auth.signOut();user=null;profile=null;isAdmin=false;$('adminNav').hidden=true;startLogin();});
@@ -125,7 +156,7 @@ async function reportMessage(m){
  alert('Report submitted privately. Thank you. The administrator will review it. No stars were deducted automatically.');
 }
 async function leaveRoom(){if(channel){const old=channel;channel=null;await db.removeChannel(old);}}
-async function loadRoom(){if(!user||!profile)return;const serial=++roomVersion;await leaveRoom();if(serial!==roomVersion)return;const room=activeRoom.toLowerCase();$('roomTitle').textContent=activeRoom;$('roomDescription').textContent=ROOMS[activeRoom];$('roomPanel').setAttribute('aria-labelledby','tab-'+activeRoom);nextLifeExpiry=null;updateRetentionNotice();$('booksBanner').hidden=activeRoom!=='Books';document.querySelectorAll('.room-tab').forEach(tab=>{const active=tab.dataset.room===activeRoom;tab.classList.toggle('active',active);tab.setAttribute('aria-selected',String(active));tab.tabIndex=active?0:-1;});clearChat();addText($('messages'),'Welcome to '+activeRoom+'. Pull up a chair.','system-message');const cutoff=new Date(Date.now()-(room==='life'?24:168)*3600000).toISOString();const {data:messages,error}=await db.from('chat_messages').select('id,room_id,author_id,body,created_at').eq('room_id',room).gte('created_at',cutoff).order('created_at',{ascending:true}).limit(200);if(serial!==roomVersion)return;if(error){addText($('messages'),error.message,'system-message');return;}const ids=[...new Set(messages.map(m=>m.author_id))];let names={};if(ids.length){const result=await db.from('member_profiles').select('user_id,username').in('user_id',ids);for(const p of result.data||[])names[p.user_id]=p.username;}if(serial!==roomVersion)return;if(room==='life'&&messages.length){nextLifeExpiry=Math.min(...messages.map(m=>new Date(m.created_at).getTime()+24*3600000));updateRetentionNotice();}for(const m of messages)drawMessage(m,names);$('messages').scrollTop=$('messages').scrollHeight;channel=db.channel('brb-room-'+room,{config:{presence:{key:user.id}}});channel.on('presence',{event:'sync'},()=>renderMembers()).on('postgres_changes',{event:'INSERT',schema:'public',table:'chat_messages',filter:'room_id=eq.'+room},async payload=>{if(serial!==roomVersion)return;const m=payload.new;let username=profile.username;if(m.author_id!==user.id){const r=await db.from('member_profiles').select('username').eq('user_id',m.author_id).maybeSingle();username=r.data?.username||'Member';}drawMessage(m,{[m.author_id]:username});if(room==='life'){nextLifeExpiry=Math.min(nextLifeExpiry??Infinity,new Date(m.created_at).getTime()+24*3600000);updateRetentionNotice();}$('messages').scrollTop=$('messages').scrollHeight;}).subscribe(async state=>{if(state==='SUBSCRIBED'&&serial===roomVersion)await channel.track({username:profile.username});});renderMembers();}
+async function loadRoom(){if(!user||!profile)return;const serial=++roomVersion;await leaveRoom();if(serial!==roomVersion)return;const room=activeRoom.toLowerCase();$('roomTitle').textContent=activeRoom;$('roomDescription').textContent=ROOMS[activeRoom];$('roomPanel').setAttribute('aria-labelledby','tab-'+activeRoom);nextLifeExpiry=null;updateRetentionNotice();$('booksBanner').hidden=activeRoom!=='Books';if(activeRoom==='Books')void loadBookClubBanner();document.querySelectorAll('.room-tab').forEach(tab=>{const active=tab.dataset.room===activeRoom;tab.classList.toggle('active',active);tab.setAttribute('aria-selected',String(active));tab.tabIndex=active?0:-1;});clearChat();addText($('messages'),'Welcome to '+activeRoom+'. Pull up a chair.','system-message');const cutoff=new Date(Date.now()-(room==='life'?24:168)*3600000).toISOString();const {data:messages,error}=await db.from('chat_messages').select('id,room_id,author_id,body,created_at').eq('room_id',room).gte('created_at',cutoff).order('created_at',{ascending:true}).limit(200);if(serial!==roomVersion)return;if(error){addText($('messages'),error.message,'system-message');return;}const ids=[...new Set(messages.map(m=>m.author_id))];let names={};if(ids.length){const result=await db.from('member_profiles').select('user_id,username').in('user_id',ids);for(const p of result.data||[])names[p.user_id]=p.username;}if(serial!==roomVersion)return;if(room==='life'&&messages.length){nextLifeExpiry=Math.min(...messages.map(m=>new Date(m.created_at).getTime()+24*3600000));updateRetentionNotice();}for(const m of messages)drawMessage(m,names);$('messages').scrollTop=$('messages').scrollHeight;channel=db.channel('brb-room-'+room,{config:{presence:{key:user.id}}});channel.on('presence',{event:'sync'},()=>renderMembers()).on('postgres_changes',{event:'INSERT',schema:'public',table:'chat_messages',filter:'room_id=eq.'+room},async payload=>{if(serial!==roomVersion)return;const m=payload.new;let username=profile.username;if(m.author_id!==user.id){const r=await db.from('member_profiles').select('username').eq('user_id',m.author_id).maybeSingle();username=r.data?.username||'Member';}drawMessage(m,{[m.author_id]:username});if(room==='life'){nextLifeExpiry=Math.min(nextLifeExpiry??Infinity,new Date(m.created_at).getTime()+24*3600000);updateRetentionNotice();}$('messages').scrollTop=$('messages').scrollHeight;}).subscribe(async state=>{if(state==='SUBSCRIBED'&&serial===roomVersion)await channel.track({username:profile.username});});renderMembers();}
 // Email dispatch is admin-authenticated server-side; the Resend key never enters this browser.
 async function dispatchModerationEmails(){
  if(!isAdmin)return;
