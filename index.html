@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.79.0/dist/umd/supabase.min.js" defer></script>
   <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
-  <script src="app.js?v=20261023-bookclub2" defer></script>
+  <script src="app.js?v=20261023-poll1" defer></script>
 </head>
 <body>
   <!-- Header / primary navigation -->
@@ -102,6 +102,11 @@
               <span id="lifeExpiryTimer" class="retention-timer" aria-label="Time until the next Life message expires"></span>
             </div>
             <div id="booksBanner" class="books-banner" hidden role="region" aria-label="Monthly book club"><span aria-hidden="true">📚</span><div class="book-club-copy"><strong>BRB Monthly Book Club</strong><span id="bookClubSelection">Book selection coming soon</span><span id="bookClubDate">Last Saturday of each month · 8 AM–8 PM Eastern</span><button id="archiveButton" class="text-button" type="button">Past discussions →</button></div></div>
+            <!-- Book club member voting, first through seventh of each month -->
+            <div id="bookPollPanel" class="book-poll-panel" hidden>
+              <h3>Choose our next reads 📚</h3><p id="bookPollSummary">November 1–7 · One vote per member</p>
+              <div id="bookPollChoices"></div><p id="bookPollStatus" role="status" aria-live="polite"></p>
+            </div>
             <div id="messages" class="messages" role="log" aria-live="polite" aria-relevant="additions text"></div>
             <form id="messageForm" class="message-compose">
               <label class="sr-only" for="messageInput">Write a message</label>
@@ -139,6 +144,9 @@
       </div>
       <!-- Monthly book club selection: admin only -->
       <div class="panel book-club-admin"><h2>Monthly book club</h2><p class="field-help">Choose the book for the next discussion. The date is the last Saturday of the month, 8 AM–8 PM Eastern.</p><form id="bookClubForm" class="form-stack"><label for="bookClubTitleInput">Book title</label><input id="bookClubTitleInput" maxlength="160" required placeholder="Enter the book title"><p id="bookClubAdminDate" class="field-help"></p><button type="submit" class="primary-button fit-button">Save this month's book</button><p id="bookClubSaveStatus" class="form-status" role="status" aria-live="polite"></p></form></div>
+      <!-- Five book choices for the upcoming member poll -->
+      <div class="panel"><h2>Book club ballot</h2><p class="field-help">Set five choices before voting opens November 1. Once the poll opens, choices are locked.</p>
+      <form id="bookPollAdminForm" class="form-stack"><div id="bookPollAdminFields"></div><button type="submit" class="primary-button fit-button">Save five books</button><p id="bookPollAdminStatus" class="form-status" role="status" aria-live="polite"></p></form></div>
       <!-- Admin email queue controls -->
       <div class="panel admin-email-panel">
         <h2>Email notifications</h2>
