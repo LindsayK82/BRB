@@ -174,12 +174,12 @@ $('signupButton').addEventListener('click',async()=>{const email=$('loginEmail')
  $('verificationCode').value='';
  $('loginForm').hidden=true;
  $('emailCodeForm').hidden=false;
- status('verificationStatus','Check your email for your six-digit confirmation code.');});
+ status('verificationStatus','Check your email for your email confirmation code.');});
 // Confirm signup directly in BRB; successful verification creates a signed-in session.
 $('emailCodeForm').addEventListener('submit',async event=>{
  event.preventDefault();
  const email=$('verificationEmail').value.trim(),token=$('verificationCode').value.trim();
- if(!/^[0-9]{6}$/.test(token)){status('verificationStatus','Enter the six digits from your email.');return;}
+ if(!/^[0-9]{6,8}$/.test(token)){status('verificationStatus','Enter the verification code from your email.');return;}
  const submit=$('emailCodeForm').querySelector('button[type="submit"]');
  submit.disabled=true;status('verificationStatus','Verifying your email…');
  try{
