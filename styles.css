@@ -52,3 +52,6 @@
 .retention-notice{display:flex;gap:.6rem;flex-wrap:wrap;justify-content:space-between;align-items:center;padding:.65rem .9rem;margin:.4rem 0 .7rem;border:1px solid #b8c1a9;background:#f1f1e8;border-radius:10px;color:#34503b;font-size:.86rem;line-height:1.5}
 .retention-timer{font-weight:700;font-variant-numeric:tabular-nums}
 .retention-timer[hidden]{display:none}
+
+/* Monthly book club banner */
+.books-banner{display:flex;align-items:flex-start;gap:12px}.books-banner[hidden]{display:none}.book-club-copy{display:flex;flex-direction:column;align-items:flex-start;gap:4px}.book-club-copy strong{font-size:1rem;color:#355d3a}.book-club-copy #bookClubSelection{font-weight:700}.book-club-copy .text-button{margin-top:4px}
