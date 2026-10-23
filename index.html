@@ -43,6 +43,17 @@
           <button type="button" class="text-button" id="resetPasswordButton">Forgot your password?</button>
           <p id="loginStatus" class="form-status" role="status"></p>
         </form>
+        <!-- Password recovery: shown only after a valid reset link opens BRB -->
+        <form id="passwordRecoveryForm" class="form-stack" hidden>
+          <h2>Choose a new password</h2>
+          <p>Enter a new password for your BRB account.</p>
+          <label for="newRecoveryPassword">New password</label>
+          <input id="newRecoveryPassword" type="password" autocomplete="new-password" minlength="6" required />
+          <label for="confirmRecoveryPassword">Confirm new password</label>
+          <input id="confirmRecoveryPassword" type="password" autocomplete="new-password" minlength="6" required />
+          <button type="submit" class="primary-button">Save new password</button>
+          <p id="passwordRecoveryStatus" class="form-status" role="status"></p>
+        </form>
         <!-- Email confirmation code: no email links or redirects required -->
         <form id="emailCodeForm" class="form-stack" hidden>
           <h2>Verify your email</h2>
