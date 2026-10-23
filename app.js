@@ -255,7 +255,31 @@ for(const tab of document.querySelectorAll('.room-tab')){tab.addEventListener('c
 $('messageInput').addEventListener('input',()=>{$('messageCount').textContent=$('messageInput').value.length+' / 500';});
 $('messageForm').addEventListener('submit',async ev=>{ev.preventDefault();if(!user||!profile)return;if(rulesRequired&&!rulesAccepted){go('chat');return;}const body=$('messageInput').value.trim();if(!body)return;const {error}=await db.from('chat_messages').insert({room_id:activeRoom.toLowerCase(),author_id:user.id,body});if(error){alert('Message not sent: '+error.message);return;}$('messageInput').value='';$('messageCount').textContent='0 / 500';});
 $('membersToggle').addEventListener('click',()=>{const visible=$('memberSidebar').classList.toggle('open');$('membersToggle').setAttribute('aria-expanded',String(visible));});
-$('archiveButton').addEventListener('click',()=>go('archive'));
+// Book club archive: read-only monthly discussions preserved independently of room retention.
+async function renderBookArchive(){
+ const area=$('archiveList');
+ area.replaceChildren();
+ const {data:sessions,error}=await db.from('book_club_sessions').select('id,event_date,title').order('event_date',{ascending:false}).limit(36);
+ if(error){area.textContent='Unable to load book club archives right now.';return;}
+ if(!sessions?.length){area.textContent='The shelves are empty for now. Our first archived discussion will appear here after book club!';return;}
+ for(const session of sessions){
+  const wrap=document.createElement('section');wrap.className='panel archive-session';
+  const heading=document.createElement('h2');heading.textContent=session.title;wrap.append(heading);
+  const messages=document.createElement('div');messages.className='archive-thread';
+  const {data:posts,error:postError}=await db.from('book_club_archive_messages').select('body,created_at,author_id,member_profiles(username)').eq('session_id',session.id).order('created_at',{ascending:true}).limit(1000);
+  if(postError){messages.textContent='Could not load this discussion.';}
+  else if(!posts?.length){messages.textContent='No messages were saved for this session.';}
+  else for(const post of posts){
+   const item=document.createElement('p');
+   const author=document.createElement('strong');author.textContent=(post.member_profiles?.username||'Former member')+': ';
+   const time=document.createElement('time');time.dateTime=post.created_at;time.textContent=new Date(post.created_at).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})+' — ';
+   const body=document.createElement('span');body.textContent=post.body;
+   item.append(time,author,body);messages.append(item);
+  }
+  wrap.append(messages);area.append(wrap);
+ }
+}
+$('archiveButton').addEventListener('click',()=>{go('archive');void renderBookArchive();});
 $('backToBooks').addEventListener('click',()=>{activeRoom='Books';go('chat');});
 async function renderProfile(){if(!user||!profile)return;$('profileName').value=profile.username;$('profileEmail').value=user.email||'';$('profilePhoto').disabled=true;$('removePhoto').disabled=true;const avatar=$('avatarPreview');avatar.textContent=profile.username[0].toUpperCase();avatar.style.backgroundImage='';status('profileStatus','');const {data}=await db.from('member_standing').select('stars').eq('user_id',user.id).maybeSingle();renderOwnCases();if(data){$('starGlyphs').textContent='★'.repeat(data.stars)+'☆'.repeat(5-data.stars);$('starSummary').textContent='You have '+data.stars+' out of 5 stars.';}}
 $('profileForm').addEventListener('submit',async ev=>{ev.preventDefault();if(!user)return;const username=$('profileName').value.trim(),email=$('profileEmail').value.trim();if(!/^[A-Za-z0-9_]{3,30}$/.test(username)){status('profileStatus','Use 3–30 letters, numbers, or underscores.');return;}const update=await db.from('member_profiles').update({username}).eq('user_id',user.id);if(update.error){status('profileStatus',update.error.message);return;}profile.username=username;$('headerUsername').textContent=username;let message='Username updated.';if(email!==user.email){const result=await db.auth.updateUser({email});message+=result.error?' Email update failed: '+result.error.message:' Check your email to confirm the address change.';}status('profileStatus',message);});
