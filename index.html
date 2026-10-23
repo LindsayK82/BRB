@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.79.0/dist/umd/supabase.min.js" defer></script>
   <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
-  <script src="app.js?v=20261023-otp2" defer></script>
+  <script src="app.js?v=20261023-errors1" defer></script>
 </head>
 <body>
   <!-- Header / primary navigation -->
@@ -125,6 +125,7 @@
               <input id="messageInput" type="text" maxlength="500" autocomplete="off" placeholder="Say something nice..." required />
               <button type="submit" class="send-button">Send <span aria-hidden="true">↗</span></button>
             </form>
+            <p id="messageSendStatus" class="form-status" role="alert" aria-live="assertive"></p>
             <div class="compose-note">Be kind. Be curious. Be right back. <span id="messageCount">0 / 500</span></div>
           </div>
           <!-- Online users (demo display; live presence after backend integration) -->
